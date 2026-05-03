@@ -1,9 +1,10 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-18", "web", "bash", "nix"]
 [nix]
 channel = "stable-25_05"
 
 [agent]
 expertMode = true
+stack = "BEST_EFFORT_FALLBACK"
 
 [workflows]
 runButton = "Project"
@@ -60,3 +61,9 @@ externalPort = 3000
 [[ports]]
 localPort = 5002
 externalPort = 3002
+
+[userenv]
+
+[userenv.shared]
+PORT = "3001"
+NODE_ENV = "development"
