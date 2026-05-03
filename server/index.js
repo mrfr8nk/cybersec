@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const numbersRoutes = require('./routes/numbers');
 const adminRoutes = require('./routes/admin');
+const pairingRoutes = require('./routes/pairing');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -45,6 +46,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/numbers', numbersRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/pairing', pairingRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'CYBERSECPRO API Online', db: 'PostgreSQL', timestamp: new Date() }));
 
