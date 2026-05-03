@@ -36,6 +36,17 @@ const initDb = async () => {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bot_sessions (
+        id SERIAL PRIMARY KEY,
+        number VARCHAR(50) UNIQUE NOT NULL,
+        status VARCHAR(10) DEFAULT 'pending' CHECK (status IN ('active', 'inactive', 'pending')),
+        connected_at TIMESTAMPTZ,
+        last_active TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
     console.log('✅ PostgreSQL tables ready');
   } finally {
     client.release();

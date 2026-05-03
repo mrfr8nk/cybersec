@@ -62,6 +62,17 @@ app.get('/api/health', (req, res) => res.json({ status: 'CYBERSECPRO API Online'
 initDb()
   .then(() => {
     app.listen(PORT, '0.0.0.0', () => console.log(`🚀 CYBERSECPRO API running on port ${PORT}`));
+
+    // Reconnect all persisted WhatsApp sessions after a short boot delay
+    setTimeout(async () => {
+      try {
+        const { autoLoadPairs } = require('../autoload');
+        const result = await autoLoadPairs({ batchSize: 3 });
+        console.log(`🔄 Sessions restored: ${result.successful}/${result.total}`);
+      } catch (err) {
+        console.error('⚠️  Session auto-load error:', err.message);
+      }
+    }, 5000);
   })
   .catch(err => {
     console.error('❌ Failed to initialize database:', err.message);

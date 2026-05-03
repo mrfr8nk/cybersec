@@ -124,12 +124,30 @@ module.exports = {
         return { success: false, message: 'Pairing directory not found', total: 0, successful: 0 };
       }
 
-      // Read all directories in pairing folder
+      // Read all directories in pairing folder.
+      // Accept both "263xxx@s.whatsapp.net" and plain "263xxx" directories
+      // (plain ones are normalised to the JID format pair.js expects).
       const files = await fs.readdir(pairingDir, { withFileTypes: true });
       const pairUsers = files
         .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name)
-        .filter(name => name.endsWith('@s.whatsapp.net'));
+        .map(dirent => {
+          const name = dirent.name;
+          if (name.endsWith('@s.whatsapp.net')) return name;
+          // Plain digits — normalise to JID
+          if (/^[0-9]+$/.test(name)) return name + '@s.whatsapp.net';
+          return null;
+        })
+        .filter(Boolean)
+        // Deduplicate (if both forms exist, keep one)
+        .filter((v, i, a) => a.indexOf(v) === i)
+        // Only include those with a valid creds.json
+        .filter(jid => {
+          const plain = jid.replace('@s.whatsapp.net', '');
+          const pathA = require('path').join(pairingDir, jid, 'creds.json');
+          const pathB = require('path').join(pairingDir, plain, 'creds.json');
+          const fsSync = require('fs');
+          return fsSync.existsSync(pathA) || fsSync.existsSync(pathB);
+        });
 
       if (pairUsers.length === 0) {
         console.log(chalk.yellow('ℹ️ No paired users found.'));

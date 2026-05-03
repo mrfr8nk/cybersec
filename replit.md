@@ -27,8 +27,16 @@ A full-stack futuristic cyberpunk SaaS web application. Features holographic UI,
 
 ## Database
 - Uses Replit's built-in **PostgreSQL** (DATABASE_URL secret — automatically available)
-- Tables created automatically on startup: `users`, `linked_numbers`
+- Tables created automatically on startup: `users`, `linked_numbers`, `bot_sessions`
+- `bot_sessions` tracks each WhatsApp number's connect/disconnect state in real-time
 - No external database needed
+
+## Bot Session Persistence
+- On every server restart, `autoload.js` scans `nexstore/pairing/` for valid session directories
+- All found sessions are reconnected automatically (batched, 3 at a time, 5-second boot delay)
+- `pair.js` calls `session-db.js` to mark sessions `active` on connect, `inactive` on logout/error
+- `session-db.js` is a thin root-level pg client (reuses `server/node_modules/pg`)
+- Works for both `263xxx@s.whatsapp.net` and plain `263xxx` directory formats
 
 ## Environment Variables
 ```

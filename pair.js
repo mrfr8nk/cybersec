@@ -13,6 +13,9 @@ const {
     makeInMemoryStore,
     generateWAMessageContent
 } = require("@whiskeysockets/baileys");
+
+// Persist session state to PostgreSQL so restarts can reload sessions
+const { updateSession } = require('./session-db');
 const NodeCache = require("node-cache");
 const _ = require('lodash')
 const {
@@ -625,7 +628,7 @@ async function startpairing(nexusDevNumber) {
             if (reason === 405) {
                 console.log(chalk.red.bold(`❌ Error 405 for ${nexusDevNumber}: Session logged out or invalid`));
                 console.log(chalk.yellow(`🗑️ Force cleaning session for ${nexusDevNumber}...`));
-                
+                updateSession(nexusDevNumber, 'inactive').catch(() => {});
                 forceCleanupSession(nexusDevNumber);
                 
                 tracker.disconnected = true;
@@ -640,15 +643,18 @@ async function startpairing(nexusDevNumber) {
                     queuePairing(nexusDevNumber);
                 } else {
                     console.error(chalk.red.bold(`❌ Failed after ${MAX_RETRIES_440} attempts for ${nexusDevNumber}`));
+                    updateSession(nexusDevNumber, 'inactive').catch(() => {});
                     forceCleanupSession(nexusDevNumber);
                     tracker.disconnected = true;
                 }
             } else if (reason === DisconnectReason.badSession) {
                 console.log(chalk.red(`❌ Invalid Session for ${nexusDevNumber}`));
+                updateSession(nexusDevNumber, 'inactive').catch(() => {});
                 forceCleanupSession(nexusDevNumber);
                 tracker.disconnected = true;
             } else if (reason === DisconnectReason.loggedOut) {
                 console.log(chalk.bgRed(`❌ ${nexusDevNumber} logged out`));
+                updateSession(nexusDevNumber, 'inactive').catch(() => {});
                 forceCleanupSession(nexusDevNumber);
                 tracker.disconnected = true;
             } else if (reason === DisconnectReason.connectionClosed || 
@@ -685,6 +691,9 @@ async function startpairing(nexusDevNumber) {
             
             // Add small delay to ensure everything is initialized
             await sleep(5000);
+
+            // Persist active status to DB
+            updateSession(nexusDevNumber, 'active').catch(() => {});
 
             // Send a connected confirmation message to the linked number
             try {
