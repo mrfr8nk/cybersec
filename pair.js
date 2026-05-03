@@ -685,7 +685,30 @@ async function startpairing(nexusDevNumber) {
             
             // Add small delay to ensure everything is initialized
             await sleep(5000);
-            
+
+            // Send a connected confirmation message to the linked number
+            try {
+                const userJid = nexusDevNumber.includes('@') ? nexusDevNumber : nexusDevNumber + '@s.whatsapp.net';
+                const connectedMsg = `╔══════════════════╗
+║  ✅ *BOT CONNECTED*  ║
+╚══════════════════╝
+
+*CYBER PRO* is now active on your number!
+
+📱 *Number:* +${nexusDevNumber.replace(/[^0-9]/g, '')}
+⚡ *Status:* ONLINE
+🕒 *Time:* ${new Date().toLocaleString()}
+
+━━━━━━━━━━━━━━━━━━
+Your bot is ready. Send *.menu* to see all available commands.
+━━━━━━━━━━━━━━━━━━`;
+
+                await nexus.sendMessage(userJid, { text: connectedMsg });
+                console.log(chalk.green(`📨 Connected message sent to ${nexusDevNumber}`));
+            } catch (msgErr) {
+                console.log(chalk.yellow(`⚠️ Could not send connected message: ${msgErr.message}`));
+            }
+
             try {
                 // Set up event listeners for this connection
                 const nexusModule = require('./case');
