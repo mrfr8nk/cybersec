@@ -1,0 +1,160 @@
+{
+  "120363420251977879@g.us": {
+    "antilink": true
+  },
+  "120363400383940116@g.us": {
+    "welcome": true,
+    "antilink": true
+  },
+  "2349051178798@s.whatsapp.net": {
+    "feature.autoreply": true,
+    "autoread": true
+  },
+  "bot": {
+    "mode": "self"
+  },
+  "120363402235338233@g.us": {
+    "welcome": true
+  },
+  "50946834291@s.whatsapp.net": {
+    "autoViewStatus": true,
+    "autoread": true,
+    "feature.autoreply": true,
+    "autobio": true
+  },
+  "120363421388316456@g.us": {
+    "antilink": true
+  },
+  "2349064880872@s.whatsapp.net": {
+    "autoViewStatus": false
+  },
+  "234@s.whatsapp.net": {
+    "banned": false
+  },
+  "0708@s.whatsapp.net": {
+    "banned": true
+  },
+  "120363423416658178@g.us": {
+    "antilink": true
+  },
+  "2349036878325@s.whatsapp.net": {
+    "autobio": false
+  },
+  "2348031635653@s.whatsapp.net": {
+    "banned": true
+  },
+  "120363402539944651@g.us": {
+    "antilink": true,
+    "feature.antispam": true
+  },
+  "120363401881182207@g.us": {
+    "antilink": true,
+    "welcome": true
+  },
+  "120363422651313566@g.us": {
+    "antilink": true,
+    "welcome": true
+  },
+  "120363351153127738@g.us": {
+    "welcome": true,
+    "antilink": true
+  },
+  "2348117238790@s.whatsapp.net": {
+    "banned": false
+  },
+  "120363403600673269@g.us": {
+    "autoTyping": true,
+    "feature.antispam": true
+  },
+  "9629954228353@lid": {
+    "feature.antibot": true
+  },
+  "2349162433523@s.whatsapp.net": {
+    "banned": true
+  },
+  "09162433523@s.whatsapp.net": {
+    "banned": true
+  },
+  "120363044073771713@g.us": {
+    "feature.antibot": false
+  },
+  "27@s.whatsapp.net": {
+    "banned": true
+  },
+  "278241168375884@s.whatsapp.net": {
+    "banned": true
+  },
+  "120363215376737325@g.us": {
+    "autoTyping": true
+  },
+  "120363400224002041@g.us": {
+    "antilink": true
+  },
+  "120363400087201848@g.us": {
+    "antilink": true
+  },
+  "97483493531674@lid": {
+    "feature.antibot": false
+  },
+  "120363203034714037@g.us": {
+    "welcome": true
+  },
+  "120363404345106056@g.us": {
+    "welcome": true
+  },
+  "120363420370889226@g.us": {
+    "antilink": true,
+    "welcome": true
+  },
+  "2348163467496@s.whatsapp.net": {
+    "autoread": false
+  },
+  "120363401718697237@g.us": {
+    "antilink": true
+  },
+  "120363373703789875@g.us": {
+    "welcome": false
+  },
+  "2349033663024@s.whatsapp.net": {
+    "autoViewStatus": false
+  },
+  "120363422605307877@g.us": {
+    "antilink": true
+  },
+  "120363421156569519@g.us": {
+    "antilink": true
+  },
+  "120363422433775045@g.us": {
+    "welcome": true
+  },
+  "120363420695480043@g.us": {
+    "welcome": true
+  },
+  "2349164286033@s.whatsapp.net": {
+    "banned": true
+  },
+  "237695205328@s.whatsapp.net": {
+    "autoViewStatus": true
+  },
+  "120363420667998038@g.us": {
+    "autoReact": true
+  },
+  "120363404475644772@g.us": {
+    "autoReact": true,
+    "feature.antibot": false,
+    "antilink": true
+  },
+  "2348089979795@s.whatsapp.net": {
+    "autoViewStatus": false
+  },
+  "152703837716614@lid": {
+    "feature.antibot": true
+  },
+  "2349138306698@s.whatsapp.net": {
+    "autobio": true
+  },
+  "120363422380017215@g.us": {
+    "autoTyping": true,
+    "feature.autoreply": true
+  }
+}
