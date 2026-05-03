@@ -6,7 +6,6 @@ const fs = require('fs');
 
 const PAIRING_BASE = path.join(__dirname, '../../nexstore/pairing');
 
-// ── helpers ──────────────────────────────────────────────────────────────────
 function ensureDir(p) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
@@ -17,36 +16,29 @@ function deleteFolderRecursive(p) {
     const cur = path.join(p, f);
     fs.lstatSync(cur).isDirectory() ? deleteFolderRecursive(cur) : fs.unlinkSync(cur);
   });
-  fs.rmdirSync(p);
+  try { fs.rmdirSync(p); } catch (_) {}
 }
 
-function isRegistered(sessionPath) {
-  const credsPath = path.join(sessionPath, 'creds.json');
-  if (!fs.existsSync(credsPath)) return false;
-  try {
-    const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-    return !!(creds?.me?.id);
-  } catch (_) { return false; }
-}
-
-// ── lazy-load Baileys deps (installed in server/node_modules) ─────────────────
+// Load Baileys from root node_modules (same version pair.js uses)
 function getBaileys() {
+  const rootPath = path.join(__dirname, '../../node_modules/@whiskeysockets/baileys');
   const {
     default: makeWASocket,
     DisconnectReason,
-    makeCacheableSignalKeyStore,
     useMultiFileAuthState,
     Browsers,
     fetchLatestBaileysVersion,
     makeInMemoryStore,
-  } = require('@whiskeysockets/baileys');
-  const { Boom } = require('@hapi/boom');
-  const pino    = require('pino');
-  const NodeCache = require('node-cache');
-  return { makeWASocket, DisconnectReason, makeCacheableSignalKeyStore,
-           useMultiFileAuthState, Browsers, fetchLatestBaileysVersion,
-           makeInMemoryStore, Boom, pino, NodeCache };
+  } = require(rootPath);
+  const { Boom } = require(path.join(__dirname, '../../node_modules/@hapi/boom'));
+  const pino    = require(path.join(__dirname, '../../node_modules/pino'));
+  const NodeCache = require(path.join(__dirname, '../../node_modules/node-cache'));
+  return { makeWASocket, DisconnectReason, useMultiFileAuthState,
+           Browsers, fetchLatestBaileysVersion, makeInMemoryStore, Boom, pino, NodeCache };
 }
+
+// Track in-progress pairing sockets so we can clean them up
+const pendingSockets = new Map();
 
 // ── POST /api/pairing/request ─────────────────────────────────────────────────
 router.post('/request', protect, async (req, res) => {
@@ -57,9 +49,15 @@ router.post('/request', protect, async (req, res) => {
   if (clean.length < 7 || clean.length > 15)
     return res.status(400).json({ error: 'Invalid phone number format.' });
 
+  // Kill any existing pending socket for this number
+  if (pendingSockets.has(clean)) {
+    try { pendingSockets.get(clean).end(); } catch (_) {}
+    pendingSockets.delete(clean);
+  }
+
   const sessionPath = path.join(PAIRING_BASE, clean);
 
-  // Always wipe any existing session so we always get a fresh pairing code
+  // Wipe any stale session so we always get a fresh code
   if (fs.existsSync(sessionPath)) deleteFolderRecursive(sessionPath);
   ensureDir(PAIRING_BASE);
   ensureDir(sessionPath);
@@ -67,30 +65,23 @@ router.post('/request', protect, async (req, res) => {
   let sock;
   try {
     const {
-      makeWASocket, DisconnectReason, makeCacheableSignalKeyStore,
-      useMultiFileAuthState, Browsers, fetchLatestBaileysVersion,
-      makeInMemoryStore, Boom, pino, NodeCache
+      makeWASocket, DisconnectReason, useMultiFileAuthState,
+      Browsers, fetchLatestBaileysVersion, makeInMemoryStore, Boom, pino, NodeCache
     } = getBaileys();
 
     const logger = pino({ level: 'silent' });
-
-    // In-memory store — exactly like pair.js
-    const store = makeInMemoryStore({ logger: logger.child({ level: 'silent', stream: 'store' }) });
-
-    // msgRetryCounterCache — exactly like pair.js
+    const store  = makeInMemoryStore({ logger: logger.child({ level: 'silent', stream: 'store' }) });
     const msgRetryCounterCache = new NodeCache();
 
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const { version } = await fetchLatestBaileysVersion();
 
+    // Use auth: state directly — exactly like pair.js — avoids the crypto error
     sock = makeWASocket({
       version,
       logger,
       printQRInTerminal: false,
-      auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, logger),
-      },
+      auth: state,
       browser: Browsers.ubuntu('Edge'),
       msgRetryCounterCache,
       getMessage: async key => {
@@ -101,9 +92,9 @@ router.post('/request', protect, async (req, res) => {
         return { conversation: '' };
       },
       shouldSyncHistoryMessage: () => false,
-      connectTimeoutMs: 60000,
-      defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 30000,
+      connectTimeoutMs: 60_000,
+      defaultQueryTimeoutMs: 60_000,
+      keepAliveIntervalMs: 30_000,
       emitOwnEvents: true,
       fireInitQueries: true,
       generateHighQualityLinkPreview: false,
@@ -113,15 +104,15 @@ router.post('/request', protect, async (req, res) => {
 
     store.bind(sock.ev);
     sock.ev.on('creds.update', saveCreds);
+    pendingSockets.set(clean, sock);
 
-    // ── get code via promise — mirrors pair.js setTimeout(..., 3000) ──────────
+    // ── Step 1: get the pairing code (same 3 s delay as pair.js) ──────────────
     const code = await new Promise((resolve, reject) => {
-      const TIMEOUT = 35000;
+      const TIMEOUT = 35_000;
       const timer = setTimeout(() => {
         reject(new Error('Timed out waiting for pairing code. Check the number and try again.'));
       }, TIMEOUT);
 
-      // Exactly as pair.js: wait 3 000 ms then requestPairingCode
       setTimeout(async () => {
         try {
           let pairCode = await sock.requestPairingCode(clean);
@@ -134,7 +125,7 @@ router.post('/request', protect, async (req, res) => {
         }
       }, 3000);
 
-      // Hard-fail on fatal WhatsApp errors
+      // Hard-fail on fatal WhatsApp errors during code request
       sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
         if (connection === 'close') {
           const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
@@ -151,12 +142,46 @@ router.post('/request', protect, async (req, res) => {
       });
     });
 
-    try { sock.end(); } catch (_) {}
+    // ── Step 2: return code to client immediately — socket stays alive ─────────
+    res.json({ code, number: clean });
 
-    return res.json({ code, number: clean });
+    // ── Step 3: in background, wait for the user to enter the code ────────────
+    // When WhatsApp confirms (connection === 'open'), hand off to pair.js
+    // exactly like the Telegram bot did.
+    sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+      if (connection === 'open') {
+        console.log(`[Pairing] ✅ ${clean} confirmed pairing — booting bot via pair.js`);
+        pendingSockets.delete(clean);
+
+        // End this lightweight socket — pair.js will create its own
+        try { sock.end(); } catch (_) {}
+
+        // Small delay to let creds flush to disk
+        await new Promise(r => setTimeout(r, 1500));
+
+        try {
+          // Load startpairing from root pair.js (same as autoload.js does)
+          const startpairing = require('../../pair');
+          await startpairing(clean);
+          console.log(`[Pairing] 🎉 Bot is live for ${clean}`);
+        } catch (err) {
+          console.error(`[Pairing] ❌ Failed to start bot for ${clean}:`, err.message);
+        }
+
+      } else if (connection === 'close') {
+        // If WhatsApp closes before confirming, clean up
+        const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+        if (statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 405) {
+          console.log(`[Pairing] Session for ${clean} closed before confirming (${statusCode})`);
+          pendingSockets.delete(clean);
+          deleteFolderRecursive(sessionPath);
+        }
+      }
+    });
 
   } catch (err) {
-    if (sock) try { sock.end(); } catch (_) {}
+    if (sock) { try { sock.end(); } catch (_) {} }
+    pendingSockets.delete(clean);
     console.error('[Pairing]', err.message);
     return res.status(500).json({ error: err.message || 'Could not generate pairing code. Please try again.' });
   }
