@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const LinkedNumber = require('../models/LinkedNumber');
+const { pool } = require('../db');
 
 const FREE_LIMIT = 5;
 
@@ -9,15 +9,18 @@ const FREE_LIMIT = 5;
 router.get('/', protect, async (req, res) => {
   try {
     const { search } = req.query;
-    let query = { ownerId: req.user._id };
+    let query, params;
     if (search) {
-      query.$or = [
-        { number: { $regex: search, $options: 'i' } },
-        { botName: { $regex: search, $options: 'i' } }
-      ];
+      query = `SELECT * FROM linked_numbers WHERE owner_id = $1
+               AND (number ILIKE $2 OR bot_name ILIKE $2)
+               ORDER BY created_at DESC`;
+      params = [req.user.id, `%${search}%`];
+    } else {
+      query = 'SELECT * FROM linked_numbers WHERE owner_id = $1 ORDER BY created_at DESC';
+      params = [req.user.id];
     }
-    const numbers = await LinkedNumber.find(query).sort({ createdAt: -1 });
-    res.json(numbers);
+    const { rows } = await pool.query(query, params);
+    res.json(rows.map(formatNumber));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -30,19 +33,23 @@ router.post('/', protect, async (req, res) => {
     if (!number || !botName) {
       return res.status(400).json({ error: 'Number and bot name are required.' });
     }
-    const plan = req.user.subscriptionPlan;
+    const plan = req.user.subscription_plan;
     const limit = plan === 'free' ? FREE_LIMIT : plan === 'pro' ? 25 : 999;
-    const count = await LinkedNumber.countDocuments({ ownerId: req.user._id });
+    const countRes = await pool.query('SELECT COUNT(*) FROM linked_numbers WHERE owner_id = $1', [req.user.id]);
+    const count = parseInt(countRes.rows[0].count);
     if (count >= limit) {
       return res.status(403).json({
         error: 'PLAN_LIMIT_REACHED',
         message: `You have reached the ${plan.toUpperCase()} plan limit of ${limit} numbers.`,
-        limit,
-        plan
+        limit, plan
       });
     }
-    const linked = await LinkedNumber.create({ number, botName, ownerId: req.user._id });
-    res.status(201).json(linked);
+    const { rows } = await pool.query(
+      `INSERT INTO linked_numbers (number, bot_name, owner_id)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [number, botName, req.user.id]
+    );
+    res.status(201).json(formatNumber(rows[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -51,12 +58,18 @@ router.post('/', protect, async (req, res) => {
 // PUT /api/numbers/:id/toggle
 router.put('/:id/toggle', protect, async (req, res) => {
   try {
-    const num = await LinkedNumber.findOne({ _id: req.params.id, ownerId: req.user._id });
-    if (!num) return res.status(404).json({ error: 'Number not found.' });
-    num.status = num.status === 'active' ? 'inactive' : 'active';
-    num.lastActive = Date.now();
-    await num.save();
-    res.json(num);
+    const check = await pool.query(
+      'SELECT * FROM linked_numbers WHERE id = $1 AND owner_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (!check.rows.length) return res.status(404).json({ error: 'Number not found.' });
+    const current = check.rows[0];
+    const newStatus = current.status === 'active' ? 'inactive' : 'active';
+    const { rows } = await pool.query(
+      "UPDATE linked_numbers SET status = $1, last_active = NOW() WHERE id = $2 RETURNING *",
+      [newStatus, req.params.id]
+    );
+    res.json(formatNumber(rows[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -65,12 +78,27 @@ router.put('/:id/toggle', protect, async (req, res) => {
 // DELETE /api/numbers/:id
 router.delete('/:id', protect, async (req, res) => {
   try {
-    const num = await LinkedNumber.findOneAndDelete({ _id: req.params.id, ownerId: req.user._id });
-    if (!num) return res.status(404).json({ error: 'Number not found.' });
+    const { rows } = await pool.query(
+      'DELETE FROM linked_numbers WHERE id = $1 AND owner_id = $2 RETURNING id',
+      [req.params.id, req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Number not found.' });
     res.json({ message: 'Number deleted successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+function formatNumber(row) {
+  return {
+    _id: row.id,
+    number: row.number,
+    botName: row.bot_name,
+    status: row.status,
+    ownerId: row.owner_id,
+    lastActive: row.last_active,
+    createdAt: row.created_at
+  };
+}
 
 module.exports = router;

@@ -1,24 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const { protect, adminOnly } = require('../middleware/auth');
-const User = require('../models/User');
-const LinkedNumber = require('../models/LinkedNumber');
+const { pool } = require('../db');
 
-// All admin routes require auth + admin role
 router.use(protect, adminOnly);
 
 // GET /api/admin/stats
 router.get('/stats', async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
-    const totalNumbers = await LinkedNumber.countDocuments();
-    const bannedUsers = await User.countDocuments({ banned: true });
-    const activeNumbers = await LinkedNumber.countDocuments({ status: 'active' });
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const onlineUsers = await User.countDocuments({ lastActive: { $gte: fiveMinAgo } });
-    const planBreakdown = await User.aggregate([
-      { $group: { _id: '$subscriptionPlan', count: { $sum: 1 } } }
-    ]);
+    const totalUsers = parseInt((await pool.query('SELECT COUNT(*) FROM users')).rows[0].count);
+    const totalNumbers = parseInt((await pool.query('SELECT COUNT(*) FROM linked_numbers')).rows[0].count);
+    const bannedUsers = parseInt((await pool.query('SELECT COUNT(*) FROM users WHERE banned = true')).rows[0].count);
+    const activeNumbers = parseInt((await pool.query("SELECT COUNT(*) FROM linked_numbers WHERE status = 'active'")).rows[0].count);
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const onlineUsers = parseInt((await pool.query('SELECT COUNT(*) FROM users WHERE last_active >= $1', [fiveMinAgo])).rows[0].count);
+    const planBreakdown = (await pool.query(
+      'SELECT subscription_plan AS _id, COUNT(*) AS count FROM users GROUP BY subscription_plan'
+    )).rows.map(r => ({ _id: r._id, count: parseInt(r.count) }));
     res.json({ totalUsers, totalNumbers, bannedUsers, activeNumbers, onlineUsers, planBreakdown });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -29,19 +27,30 @@ router.get('/stats', async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const { search, page = 1, limit = 20 } = req.query;
-    let query = {};
+    const offset = (page - 1) * limit;
+    let query, countQuery, params, countParams;
     if (search) {
-      query.$or = [
-        { username: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ];
+      query = `SELECT id, username, email, role, subscription_plan, banned, last_active, created_at
+               FROM users WHERE username ILIKE $1 OR email ILIKE $1
+               ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
+      countQuery = 'SELECT COUNT(*) FROM users WHERE username ILIKE $1 OR email ILIKE $1';
+      params = [`%${search}%`, parseInt(limit), offset];
+      countParams = [`%${search}%`];
+    } else {
+      query = `SELECT id, username, email, role, subscription_plan, banned, last_active, created_at
+               FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`;
+      countQuery = 'SELECT COUNT(*) FROM users';
+      params = [parseInt(limit), offset];
+      countParams = [];
     }
-    const users = await User.find(query)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
-    const total = await User.countDocuments(query);
-    res.json({ users, total, page: parseInt(page), pages: Math.ceil(total / limit) });
+    const { rows: users } = await pool.query(query, params);
+    const total = parseInt((await pool.query(countQuery, countParams)).rows[0].count);
+    res.json({
+      users: users.map(u => ({ ...u, subscriptionPlan: u.subscription_plan })),
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit)
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -50,11 +59,17 @@ router.get('/users', async (req, res) => {
 // GET /api/admin/numbers
 router.get('/numbers', async (req, res) => {
   try {
-    const numbers = await LinkedNumber.find()
-      .populate('ownerId', 'username email')
-      .sort({ createdAt: -1 })
-      .limit(100);
-    res.json(numbers);
+    const { rows } = await pool.query(`
+      SELECT ln.*, u.username, u.email
+      FROM linked_numbers ln
+      JOIN users u ON ln.owner_id = u.id
+      ORDER BY ln.created_at DESC LIMIT 100
+    `);
+    res.json(rows.map(r => ({
+      _id: r.id, number: r.number, botName: r.bot_name,
+      status: r.status, createdAt: r.created_at,
+      ownerId: { username: r.username, email: r.email }
+    })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -63,12 +78,13 @@ router.get('/numbers', async (req, res) => {
 // PUT /api/admin/users/:id/ban
 router.put('/users/:id/ban', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+    const user = rows[0];
     if (user.role === 'admin') return res.status(403).json({ error: 'Cannot ban admin.' });
-    user.banned = !user.banned;
-    await user.save({ validateBeforeSave: false });
-    res.json({ message: `User ${user.banned ? 'banned' : 'unbanned'}.`, banned: user.banned });
+    const newBanned = !user.banned;
+    await pool.query('UPDATE users SET banned = $1 WHERE id = $2', [newBanned, user.id]);
+    res.json({ message: `User ${newBanned ? 'banned' : 'unbanned'}.`, banned: newBanned });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -77,11 +93,10 @@ router.put('/users/:id/ban', async (req, res) => {
 // DELETE /api/admin/users/:id
 router.delete('/users/:id', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ error: 'User not found.' });
-    if (user.role === 'admin') return res.status(403).json({ error: 'Cannot delete admin.' });
-    await LinkedNumber.deleteMany({ ownerId: user._id });
-    await User.findByIdAndDelete(req.params.id);
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+    if (rows[0].role === 'admin') return res.status(403).json({ error: 'Cannot delete admin.' });
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
     res.json({ message: 'User and their numbers deleted.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -95,13 +110,12 @@ router.put('/users/:id/plan', async (req, res) => {
     if (!['free', 'pro', 'enterprise'].includes(plan)) {
       return res.status(400).json({ error: 'Invalid plan.' });
     }
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { subscriptionPlan: plan },
-      { new: true }
+    const { rows } = await pool.query(
+      'UPDATE users SET subscription_plan = $1 WHERE id = $2 RETURNING id, username, email, subscription_plan',
+      [plan, req.params.id]
     );
-    if (!user) return res.status(404).json({ error: 'User not found.' });
-    res.json({ message: `Plan updated to ${plan}.`, user });
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+    res.json({ message: `Plan updated to ${plan}.`, user: rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

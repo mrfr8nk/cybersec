@@ -1,7 +1,7 @@
 # CYBERSECPRO — Futuristic Cyberpunk SaaS Platform
 
 ## What this project is
-A full-stack futuristic cyberpunk SaaS web application converted from a Telegram bot system. Features holographic UI, bot number management, JWT authentication, admin dashboard, and MongoDB database.
+A full-stack futuristic cyberpunk SaaS web application. Features holographic UI, bot number management, JWT authentication, admin dashboard, and PostgreSQL database (Replit built-in).
 
 ## Project Structure
 ```
@@ -10,15 +10,14 @@ A full-stack futuristic cyberpunk SaaS web application converted from a Telegram
 │   ├── src/
 │   │   ├── pages/          # Landing, Login, Signup, Dashboard, Admin
 │   │   ├── contexts/       # AuthContext (JWT)
-│   │   └── index.css       # Cyberpunk neon styles
+│   │   └── index.css       # Cyberpunk neon styles (deep blue theme)
 │   ├── vite.config.js      # Proxy /api → port 3001
 │   └── tailwind.config.js
 ├── server/         # Express.js backend (port 3001)
+│   ├── db.js               # PostgreSQL connection + table init
 │   ├── routes/             # auth, user, numbers, admin
-│   ├── models/             # User, LinkedNumber (Mongoose)
 │   ├── middleware/         # auth.js (JWT protect/adminOnly)
 │   └── index.js            # Entry point
-└── start-dev.sh    # Starts both services
 ```
 
 ## Running the Project
@@ -26,18 +25,22 @@ A full-stack futuristic cyberpunk SaaS web application converted from a Telegram
 - **Backend API** workflow: `node server/index.js` → port 3001
 - Frontend proxies all `/api/*` calls to backend via Vite proxy
 
+## Database
+- Uses Replit's built-in **PostgreSQL** (DATABASE_URL secret — automatically available)
+- Tables created automatically on startup: `users`, `linked_numbers`
+- No external database needed
+
 ## Environment Variables
 ```
-MONGODB_URI=mongodb://...  # MongoDB connection string
-JWT_SECRET=your_secret     # JWT signing secret
-PORT=3001                  # Backend port (default)
-CLIENT_URL=...             # Frontend URL for CORS
+DATABASE_URL=...   # Auto-provided by Replit PostgreSQL
+JWT_SECRET=...     # JWT signing secret (optional, has default)
+PORT=3001          # Backend port (default)
 ```
 
 ## Tech Stack
 - **Frontend**: React 18 + Vite, Tailwind CSS, Framer Motion, React Router, Axios
-- **Backend**: Node.js + Express.js, Mongoose, bcryptjs, jsonwebtoken
-- **Database**: MongoDB (via MONGODB_URI env var)
+- **Backend**: Node.js + Express.js, pg (PostgreSQL), bcryptjs, jsonwebtoken
+- **Database**: PostgreSQL via Replit built-in (DATABASE_URL)
 - **Security**: Helmet, express-rate-limit, express-mongo-sanitize, JWT
 
 ## API Routes
@@ -61,14 +64,21 @@ CLIENT_URL=...             # Frontend URL for CORS
 
 ## Plan Limits
 - FREE: 5 linked numbers
-- PRO: 25 linked numbers
-- ENTERPRISE: Unlimited
-
-## UI Theme
-- Cyberpunk holographic design
-- Colors: Neon Cyan (#00f5ff), Electric Blue (#0080ff), Purple (#8b5cf6), Neon Pink (#ff00ff)
-- Fonts: Orbitron (display), Share Tech Mono (code), Exo 2 (body)
-- Effects: Matrix rain, HUD rings, glassmorphism, neon glow, particle background
+- PRO: 25 linked numbers (contact +923417022212)
+- ENTERPRISE: Unlimited (contact +923417022212)
 
 ## To Make Admin
-Set a user's `role` field to `"admin"` directly in MongoDB.
+Run in server directory:
+```js
+const { pool, initDb } = require('./db');
+initDb().then(async () => {
+  await pool.query("UPDATE users SET role = 'admin' WHERE email = 'your@email.com'");
+  process.exit(0);
+});
+```
+
+## UI Theme
+- Deep blue/navy cyberpunk design (not pure black)
+- Colors: Neon Cyan (#00f5ff), Electric Blue (#0080ff), Purple (#8b5cf6), Neon Pink (#ff00ff)
+- Fonts: Orbitron (display), Share Tech Mono (code), Exo 2 (body)
+- Mobile-responsive with hamburger menu
