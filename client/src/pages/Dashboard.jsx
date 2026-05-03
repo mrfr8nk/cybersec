@@ -44,30 +44,36 @@ const ParticleBg = () => {
 const PlanLimitModal = ({ onClose, plan }) => (
   <AnimatePresence>
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
       <motion.div initial={{ scale: 0.8, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, y: 30 }}
-        className="relative max-w-md w-full mx-4 rounded-xl p-8 text-center overflow-hidden"
-        style={{ background: 'linear-gradient(145deg, rgba(255,0,0,0.1), rgba(2,4,8,0.98))', border: '1px solid rgba(255,68,68,0.4)', boxShadow: '0 0 60px rgba(255,0,0,0.2)' }}>
+        className="relative max-w-md w-full rounded-xl p-6 sm:p-8 text-center overflow-hidden"
+        style={{ background: 'linear-gradient(145deg, rgba(255,0,0,0.12), rgba(6,9,26,0.98))', border: '1px solid rgba(255,68,68,0.4)', boxShadow: '0 0 60px rgba(255,0,0,0.2)' }}>
         <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-red-500" />
         <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-red-500" />
         <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-red-500" />
         <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-red-500" />
         <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
           className="text-5xl mb-4">🚫</motion.div>
-        <h2 className="font-display font-bold text-xl text-red-400 tracking-widest mb-2">FREE PLAN LIMIT REACHED</h2>
-        <p className="font-mono text-xs text-gray-400 mb-6 leading-relaxed">
-          You have reached the maximum of 5 linked numbers for the FREE plan.<br />
-          Upgrade to PRO for up to 25 numbers or ENTERPRISE for unlimited access.
+        <h2 className="font-display font-bold text-lg sm:text-xl text-red-400 tracking-widest mb-2">FREE PLAN LIMIT REACHED</h2>
+        <p className="font-mono text-xs text-gray-400 mb-4 leading-relaxed">
+          You have reached the maximum of 5 linked numbers for the FREE plan.
         </p>
+        <div className="glass-bright rounded-lg px-4 py-3 mb-6" style={{ border: '1px solid rgba(139,92,246,0.4)' }}>
+          <div className="font-mono text-xs text-gray-400 mb-1">TO UPGRADE YOUR PLAN, CONTACT:</div>
+          <a href="https://wa.me/923417022212" target="_blank" rel="noreferrer"
+            className="font-display font-bold text-base text-[#8b5cf6]">+923417022212</a>
+        </div>
         <div className="flex gap-3">
           <button onClick={onClose}
             className="flex-1 py-2 rounded font-mono text-xs text-gray-500 border border-gray-700 hover:border-gray-500 transition-all">
             DISMISS
           </button>
-          <button className="flex-1 py-2 rounded font-display text-xs tracking-widest"
-            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.4), rgba(255,0,255,0.2))', border: '1px solid rgba(139,92,246,0.5)', color: '#fff' }}>
-            UPGRADE NOW
-          </button>
+          <a href="https://wa.me/923417022212" target="_blank" rel="noreferrer" className="flex-1">
+            <button className="w-full py-2 rounded font-display text-xs tracking-widest"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.4), rgba(255,0,255,0.2))', border: '1px solid rgba(139,92,246,0.5)', color: '#fff' }}>
+              📱 CONTACT NOW
+            </button>
+          </a>
         </div>
       </motion.div>
     </motion.div>
@@ -157,7 +163,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showLimit, setShowLimit] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [profileEdit, setProfileEdit] = useState({ username: user?.username || '' });
   const [profileLoading, setProfileLoading] = useState(false);
 
