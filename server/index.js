@@ -1,4 +1,13 @@
 require('dotenv').config();
+
+// Prevent pair.js background errors from crashing the API server
+process.on('uncaughtException', err => {
+  console.error('[Server] Uncaught exception (non-fatal):', err.message);
+});
+process.on('unhandledRejection', err => {
+  console.error('[Server] Unhandled rejection (non-fatal):', err?.message || err);
+});
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');

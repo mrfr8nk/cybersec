@@ -64,15 +64,17 @@ router.post('/request', protect, async (req, res) => {
       console.error(`[Pairing] startpairing error for ${clean}:`, err.message);
     });
 
-    // Wait for pair.js to write pairing.json (same delay bot.js uses: 4 s)
+    // Wait for pair.js to write pairing.json
+    // pair.js stores number as "263xxx@s.whatsapp.net" so we match digits only
     let code = null;
-    const deadline = Date.now() + 35_000;
+    const deadline = Date.now() + 40_000;
     while (Date.now() < deadline) {
       await sleep(1000);
       try {
         const raw = await fs.readFile(PAIRING_JSON, 'utf-8');
         const obj = JSON.parse(raw);
-        if (obj.code && obj.number === clean) {
+        const savedNum = (obj.number || '').replace(/[^0-9]/g, '');
+        if (obj.code && savedNum === clean) {
           code = obj.code;
           break;
         }

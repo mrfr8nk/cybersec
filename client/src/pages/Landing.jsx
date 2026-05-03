@@ -387,6 +387,14 @@ export default function Landing() {
           <div className="font-mono text-xs text-gray-600 text-center">
             © 2026 CYBERSECPRO — FUTURISTIC BOT MANAGEMENT SYSTEM
           </div>
+          <div className="font-mono text-xs text-center" style={{ color: 'rgba(0,245,255,0.35)' }}>
+            Web by{' '}
+            <a href="https://github.com/mrfr8nk" target="_blank" rel="noreferrer"
+              className="hover:text-[#00f5ff] transition-colors duration-200"
+              style={{ color: 'rgba(0,245,255,0.55)' }}>
+              mr frank ofc
+            </a>
+          </div>
         </div>
       </footer>
     </div>
