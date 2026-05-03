@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "89CTSYsaO6gV7gGzkC91o"
+uri = "file://README.md"
+type = "text"
+title = "CyberSecPro — Deployment README"
