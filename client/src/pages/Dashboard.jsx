@@ -69,17 +69,18 @@ const PlanLimitModal = ({ onClose }) => (
   </motion.div>
 );
 
-/* ─── Link Number Modal (with real pairing code) ─── */
+/* ─── Link Number Modal (with real pairing code + copy) ─── */
 const LinkModal = ({ onClose, onAdd }) => {
-  const [step, setStep] = useState(1); // 1=form, 2=code
+  const [step, setStep] = useState(1); // 1=form, 2=loading, 3=code
   const [form, setForm] = useState({ number: '', botName: '' });
   const [code, setCode] = useState('');
+  const [copied, setCopied] = useState(false);
   const [timer, setTimer] = useState(300);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const timerRef = useRef(null);
 
   useEffect(() => {
-    if (step === 2) {
+    if (step === 3) {
       timerRef.current = setInterval(() => setTimer(t => {
         if (t <= 1) { clearInterval(timerRef.current); return 0; }
         return t - 1;
@@ -90,42 +91,43 @@ const LinkModal = ({ onClose, onAdd }) => {
 
   const fmt = s => `${Math.floor(s / 60).toString().padStart(2,'0')}:${(s % 60).toString().padStart(2,'0')}`;
 
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      toast.success('Code copied!');
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
   const handleRequest = async e => {
     e.preventDefault();
     if (!form.number || !form.botName) return toast.error('All fields required');
-    setLoading(true);
+    setStep(2); // show loading/connecting state
     try {
       const { data } = await axios.post('/api/pairing/request', { phoneNumber: form.number });
-      if (data.alreadyPaired) {
-        // Save directly
-        const res = await axios.post('/api/numbers', { number: form.number, botName: form.botName });
-        onAdd(res.data);
-        toast.success('NUMBER LINKED SUCCESSFULLY');
-        onClose();
-      } else {
-        setCode(data.code);
-        setStep(2);
-      }
+      setCode(data.code);
+      setTimer(300);
+      setStep(3);
     } catch (err) {
+      setStep(1);
       if (err.response?.data?.error === 'PLAN_LIMIT_REACHED') {
-        toast.error('Plan limit reached');
-        onClose();
+        toast.error('Plan limit reached'); onClose();
       } else {
-        toast.error(err.response?.data?.error || 'Failed to get pairing code');
+        toast.error(err.response?.data?.error || 'Failed to get pairing code. Try again.');
       }
-    } finally { setLoading(false); }
+    }
   };
 
   const handleConfirm = async () => {
-    setLoading(true);
+    setSaving(true);
     try {
       const res = await axios.post('/api/numbers', { number: form.number, botName: form.botName });
       onAdd(res.data);
       toast.success('NUMBER LINKED SUCCESSFULLY');
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to link number');
-    } finally { setLoading(false); }
+      toast.error(err.response?.data?.error || 'Failed to save number');
+    } finally { setSaving(false); }
   };
 
   return (
@@ -133,18 +135,22 @@ const LinkModal = ({ onClose, onAdd }) => {
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
         className="w-full max-w-md rounded-2xl overflow-hidden"
-        style={{ background: 'rgba(10,20,60,0.95)', backdropFilter: 'blur(30px)', border: '1px solid rgba(0,245,255,0.25)' }}>
+        style={{ background: 'rgba(10,20,60,0.97)', backdropFilter: 'blur(30px)', border: '1px solid rgba(0,245,255,0.25)' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(0,245,255,0.1)]">
           <div className="font-display text-sm text-[#00f5ff] tracking-widest">
-            {step === 1 ? 'LINK WhatsApp NUMBER' : 'ENTER PAIRING CODE'}
+            {step === 1 ? 'LINK WhatsApp NUMBER' : step === 2 ? 'CONNECTING TO WHATSAPP' : 'YOUR PAIRING CODE'}
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
+          {step !== 2 && (
+            <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
+          )}
         </div>
 
         <div className="p-5">
           <AnimatePresence mode="wait">
+
+            {/* ── Step 1: Form ── */}
             {step === 1 && (
               <motion.form key="form" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
                 onSubmit={handleRequest} className="space-y-4">
@@ -154,70 +160,106 @@ const LinkModal = ({ onClose, onAdd }) => {
                   </label>
                   <input value={form.number} onChange={e => setForm(p => ({ ...p, number: e.target.value }))}
                     className="input-neon rounded-xl w-full" placeholder="923417022212" inputMode="tel" />
-                  <p className="font-mono text-[10px] text-gray-600 mt-1">Example: 923417022212 (no + or spaces)</p>
+                  <p className="font-mono text-[10px] text-gray-600 mt-1">No + or spaces — e.g. 923417022212</p>
                 </div>
                 <div>
                   <label className="font-mono text-[10px] text-[#00f5ff] tracking-widest block mb-2">BOT NAME</label>
                   <input value={form.botName} onChange={e => setForm(p => ({ ...p, botName: e.target.value }))}
                     className="input-neon rounded-xl w-full" placeholder="MY_BOT_ALPHA" />
                 </div>
-                <button type="submit" disabled={loading}
+                <button type="submit"
                   className="w-full py-3 rounded-xl font-display text-sm tracking-widest text-white"
                   style={{ background: 'linear-gradient(135deg,rgba(0,245,255,0.3),rgba(139,92,246,0.3))', border: '1px solid rgba(0,245,255,0.5)', boxShadow: '0 0 20px rgba(0,245,255,0.2)' }}>
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="cyber-spinner w-5 h-5" />REQUESTING CODE...
-                    </span>
-                  ) : '⚡ GET PAIRING CODE'}
+                  ⚡ GET PAIRING CODE
                 </button>
               </motion.form>
             )}
 
+            {/* ── Step 2: Connecting loader ── */}
             {step === 2 && (
-              <motion.div key="code" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="py-8 flex flex-col items-center gap-5">
+                <div className="relative w-16 h-16">
+                  <div className="absolute inset-0 rounded-full border-2 border-[rgba(0,245,255,0.15)]" />
+                  <div className="absolute inset-0 rounded-full border-t-2 border-[#00f5ff] animate-spin"
+                    style={{ boxShadow: '0 0 12px rgba(0,245,255,0.5)' }} />
+                  <div className="absolute inset-3 rounded-full border-t-2 border-[#8b5cf6] animate-spin"
+                    style={{ animationDirection: 'reverse', animationDuration: '0.7s' }} />
+                  <div className="absolute inset-0 flex items-center justify-center text-xl">📱</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-display text-sm text-[#00f5ff] tracking-widest mb-1">CONNECTING TO WHATSAPP</div>
+                  <div className="font-mono text-[10px] text-gray-500">Requesting pairing code for {form.number}…</div>
+                  <div className="font-mono text-[10px] text-gray-600 mt-1">This takes ~5 seconds</div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── Step 3: Code display ── */}
+            {step === 3 && (
+              <motion.div key="code" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
                 className="space-y-4">
-                {/* Code display */}
+
+                {/* Big code box with copy */}
                 <div className="rounded-2xl p-5 text-center"
-                  style={{ background: 'rgba(0,245,255,0.06)', border: '1px solid rgba(0,245,255,0.25)' }}>
+                  style={{ background: 'rgba(0,245,255,0.06)', border: '1px solid rgba(0,245,255,0.3)', boxShadow: '0 0 30px rgba(0,245,255,0.08)' }}>
                   <div className="font-mono text-[10px] text-gray-400 tracking-widest mb-3">YOUR PAIRING CODE</div>
-                  <div className="font-display font-black text-3xl sm:text-4xl tracking-[8px]"
-                    style={{ color: '#00f5ff', textShadow: '0 0 20px rgba(0,245,255,0.8)' }}>
+
+                  {/* The code itself */}
+                  <div className="font-display font-black text-4xl sm:text-5xl tracking-[10px] mb-4"
+                    style={{ color: '#00f5ff', textShadow: '0 0 30px rgba(0,245,255,0.9)', letterSpacing: '0.2em' }}>
                     {code}
                   </div>
-                  <div className="mt-3 font-mono text-sm" style={{ color: timer < 60 ? '#ff4444' : '#00ff88' }}>
-                    ⏱ {fmt(timer)} remaining
+
+                  {/* Copy button */}
+                  <motion.button
+                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                    onClick={handleCopy}
+                    className="w-full py-3 rounded-xl font-display text-sm tracking-widest transition-all"
+                    style={{
+                      background: copied ? 'rgba(0,255,136,0.2)' : 'rgba(0,245,255,0.12)',
+                      border: copied ? '1px solid rgba(0,255,136,0.5)' : '1px solid rgba(0,245,255,0.4)',
+                      color: copied ? '#00ff88' : '#00f5ff',
+                      boxShadow: copied ? '0 0 16px rgba(0,255,136,0.25)' : '0 0 16px rgba(0,245,255,0.15)'
+                    }}>
+                    {copied ? '✓ COPIED!' : '⧉ TAP TO COPY CODE'}
+                  </motion.button>
+
+                  <div className="mt-3 font-mono text-xs" style={{ color: timer < 60 ? '#ff4444' : '#00ff88' }}>
+                    ⏱ expires in {fmt(timer)}
                   </div>
                 </div>
 
                 {/* Steps */}
-                <div className="rounded-xl p-4 space-y-3"
+                <div className="rounded-xl p-4 space-y-2.5"
                   style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                  <div className="font-mono text-[10px] text-[#8b5cf6] tracking-widest mb-2">HOW TO LINK</div>
+                  <div className="font-mono text-[10px] text-[#8b5cf6] tracking-widest mb-2">HOW TO ENTER THE CODE</div>
                   {[
                     'Open WhatsApp on your phone',
-                    'Tap Menu (⋮) → Linked Devices',
+                    'Tap ⋮ Menu → Linked Devices',
                     'Tap "Link a Device"',
                     'Tap "Link with phone number instead"',
-                    `Enter the code above: ${code}`,
+                    'Type the code shown above',
                   ].map((s, i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <span className="font-display text-xs w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center"
+                      <span className="font-display text-[10px] w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center"
                         style={{ background: 'rgba(139,92,246,0.3)', color: '#8b5cf6' }}>{i + 1}</span>
-                      <span className="font-mono text-xs text-gray-300">{s}</span>
+                      <span className="font-mono text-xs text-gray-300 leading-relaxed">{s}</span>
                     </div>
                   ))}
                 </div>
 
                 <div className="flex gap-3">
-                  <button onClick={() => setStep(1)} className="flex-1 py-3 rounded-xl font-mono text-xs text-gray-400"
+                  <button onClick={() => { setStep(1); setTimer(300); }} className="py-3 px-4 rounded-xl font-mono text-xs text-gray-400"
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    ← BACK
+                    ← NEW CODE
                   </button>
-                  <button onClick={handleConfirm} disabled={loading || timer === 0}
-                    className="flex-2 px-6 py-3 rounded-xl font-display text-xs tracking-widest text-white"
-                    style={{ background: 'linear-gradient(135deg,rgba(0,255,136,0.3),rgba(0,245,255,0.2))', border: '1px solid rgba(0,255,136,0.4)', flex: 2 }}>
-                    {loading ? 'SAVING...' : '✓ CODE ENTERED — SAVE'}
-                  </button>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                    onClick={handleConfirm} disabled={saving || timer === 0}
+                    className="flex-1 py-3 rounded-xl font-display text-xs tracking-widest text-white"
+                    style={{ background: 'linear-gradient(135deg,rgba(0,255,136,0.3),rgba(0,245,255,0.2))', border: '1px solid rgba(0,255,136,0.4)', boxShadow: '0 0 16px rgba(0,255,136,0.15)' }}>
+                    {saving ? 'SAVING...' : '✓ I ENTERED THE CODE — SAVE'}
+                  </motion.button>
                 </div>
               </motion.div>
             )}

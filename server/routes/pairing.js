@@ -59,11 +59,7 @@ router.post('/request', protect, async (req, res) => {
 
   const sessionPath = path.join(PAIRING_BASE, clean);
 
-  // Already registered → no code needed
-  if (isRegistered(sessionPath))
-    return res.json({ code: null, alreadyPaired: true });
-
-  // Wipe any broken incomplete session
+  // Always wipe any existing session so we always get a fresh pairing code
   if (fs.existsSync(sessionPath)) deleteFolderRecursive(sessionPath);
   ensureDir(PAIRING_BASE);
   ensureDir(sessionPath);
