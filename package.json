@@ -4,10 +4,11 @@
   "description": "Nexus Cleaned whatsapp bot",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
     "bot": "node bot.js",
-    "test": "node --check index.js"
+    "test": "node --check index.js",
+    "heroku-postbuild": "cd client && npm install && npm run build && cd .."
   },
   "keywords": [
     "whiskeysockets",

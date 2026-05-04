@@ -1,63 +1,43 @@
-// Thin PostgreSQL client used by pair.js to persist session state.
-// Uses pg from server/node_modules so root package.json stays clean.
-let pool = null;
+// Thin database client used by pair.js (root level) to persist session state.
+// Supports both MongoDB (via db-service) and PostgreSQL (via pg pool).
+// All failures are non-fatal — the filesystem session is the source of truth.
 
-function getPool() {
-  if (pool) return pool;
+let _ready = false;
+
+async function _init() {
+  if (_ready) return;
   try {
-    const { Pool } = require('./server/node_modules/pg');
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: false,
-      max: 3,
-      idleTimeoutMillis: 30000,
-    });
-    pool.on('error', () => {}); // swallow idle-client errors silently
-  } catch (_) {
-    pool = null;
-  }
-  return pool;
+    require('./server/db');            // load env / initialise pool
+    const { initDb } = require('./server/db');
+    await initDb();
+  } catch (_) {}
+  _ready = true;
 }
 
 /**
- * Upsert a session row into bot_sessions.
- * @param {string} number  – digits only (e.g. "263719647303")
+ * Upsert a session row.
+ * @param {string} number  – digits only, or JID like "263xxx@s.whatsapp.net"
  * @param {'active'|'inactive'|'pending'} status
  */
 async function updateSession(number, status) {
-  const db = getPool();
-  if (!db) return;
-  const clean = number.replace(/[^0-9]/g, '');
-  if (!clean) return;
   try {
-    await db.query(
-      `INSERT INTO bot_sessions (number, status, connected_at, last_active)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (number) DO UPDATE
-         SET status      = $2,
-             last_active = NOW(),
-             connected_at = CASE WHEN $2 = 'active' THEN NOW()
-                                 ELSE bot_sessions.connected_at END`,
-      [clean, status, status === 'active' ? new Date() : null]
-    );
+    await _init();
+    const { upsertBotSession } = require('./server/db-service');
+    await upsertBotSession(number, status);
   } catch (err) {
-    // Non-fatal — session file is the source of truth
     console.error('[session-db] update failed:', err.message);
   }
 }
 
 /**
- * Return all numbers that have status 'active' in bot_sessions.
- * Used by autoload to know which sessions to reconnect.
+ * Return all numbers currently marked active.
+ * @returns {Promise<string[]>}
  */
 async function getActiveSessions() {
-  const db = getPool();
-  if (!db) return [];
   try {
-    const { rows } = await db.query(
-      `SELECT number FROM bot_sessions WHERE status = 'active' ORDER BY last_active DESC`
-    );
-    return rows.map(r => r.number);
+    await _init();
+    const { getActiveBotSessions } = require('./server/db-service');
+    return await getActiveBotSessions();
   } catch (err) {
     console.error('[session-db] getActiveSessions failed:', err.message);
     return [];

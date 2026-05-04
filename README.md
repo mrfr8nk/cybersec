@@ -4,15 +4,25 @@ A full-stack SaaS platform where users sign up, link their WhatsApp numbers via 
 
 ---
 
+## One-Click Heroku Deploy
+
+[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/mrfr8nk/cybersec)
+
+The button above opens the Heroku deploy page for **github.com/mrfr8nk/cybersec**.  
+Heroku will prompt you to fill in the environment variables defined in `app.json`.  
+A free PostgreSQL database is automatically provisioned — no setup needed if you skip `MONGO_URL`.
+
+---
+
 ## Table of Contents
 
 - [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
+- [Database Options](#database-options)
 - [Environment Variables](#environment-variables)
 - [Deployment Guides](#deployment-guides)
+  - [Heroku (Website / Button)](#heroku-website--button)
   - [Railway](#railway)
   - [Render](#render)
-  - [Heroku](#heroku)
   - [VPS (Ubuntu / Debian)](#vps-ubuntu--debian)
 - [Post-Deployment Checklist](#post-deployment-checklist)
 - [Making a User an Admin](#making-a-user-an-admin)
@@ -32,12 +42,15 @@ A full-stack SaaS platform where users sign up, link their WhatsApp numbers via 
 │  └───────────────┘     │  Port: $PORT (3001)    ││
 │                        └──────────┬─────────────┘│
 │                                   │              │
-│                        ┌──────────▼─────────────┐│
-│                        │     PostgreSQL DB       ││
-│                        │  users                 ││
-│                        │  linked_numbers         ││
-│                        │  bot_sessions           ││
-│                        └────────────────────────┘│
+│                     ┌─────────────▼────────────┐ │
+│                     │   server/db-service.js   │ │
+│                     │   (unified DB adapter)   │ │
+│                     └──────┬──────────┬────────┘ │
+│                            │          │           │
+│                  ┌─────────▼──┐  ┌────▼─────────┐│
+│                  │  MongoDB   │  │  PostgreSQL  ││
+│                  │ (Mongoose) │  │    (pg)      ││
+│                  └────────────┘  └─────────────┘│
 │                                                  │
 │  ┌──────────────────────────────────────────────┐│
 │  │  pair.js  (Baileys — WhatsApp sessions)      ││
@@ -47,36 +60,40 @@ A full-stack SaaS platform where users sign up, link their WhatsApp numbers via 
 └──────────────────────────────────────────────────┘
 ```
 
-**Key facts before you deploy:**
-
-- Node.js **20 or later** is required — Baileys does not work on Node 18
-- WhatsApp session files live in `nexstore/pairing/` — this directory **must be on persistent storage** or users will have to re-pair after every restart
-- The Express backend can serve the compiled React frontend as static files in production
-- PostgreSQL is required — the app exits immediately if `DATABASE_URL` is missing
+**Key facts:**
+- Node.js **20+** required — Baileys will not work on Node 18
+- The app works with **MongoDB OR PostgreSQL** — set one, the other is ignored
+- WhatsApp session files live in `nexstore/pairing/` — needs persistent storage on cloud platforms
+- The Express backend serves the compiled React frontend as static files in production
+- Admin account is created automatically on first boot using `ADMIN_EMAIL` + `ADMIN_PASSWORD`
 
 ---
 
-## Prerequisites
+## Database Options
 
-| Requirement | Minimum version |
-|---|---|
-| Node.js | 20.x |
-| npm | 9.x |
-| PostgreSQL | 13+ |
-| Git | any recent |
+The app auto-detects which database to use at startup — in this priority order:
+
+| Priority | Variable | DB used |
+|---|---|---|
+| 1 | `MONGO_URL` is set | MongoDB (Mongoose) |
+| 2 | `DATABASE_URL` is set | PostgreSQL (pg) |
+| 3 | Neither is set | Built-in Replit PostgreSQL fallback *(only works on Replit)* |
+
+You only need **one** database. On Heroku, the free PostgreSQL addon is automatically provisioned by `app.json` so `DATABASE_URL` is always available even if you skip `MONGO_URL`.
 
 ---
 
 ## Environment Variables
 
-Configure these in your platform's secrets / environment panel — never commit them to Git.
-
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | **Yes** | Full PostgreSQL connection string — `postgresql://user:pass@host:5432/dbname` |
-| `JWT_SECRET` | **Yes** | Random string for signing JWT tokens. Generate: `openssl rand -hex 64` |
-| `PORT` | No | Port the API server binds to. Defaults to `3001`. Most platforms set this automatically. |
-| `NODE_ENV` | No | Set to `production` on live deployments |
+| `MONGO_URL` | No | MongoDB connection string — e.g. `mongodb+srv://user:pass@cluster.mongodb.net/cybersecpro`. Get a free cluster at **mongodb.com/atlas**. If not set, PostgreSQL is used. |
+| `DATABASE_URL` | No | PostgreSQL connection string. Auto-injected on Heroku (via addon) and Railway. |
+| `JWT_SECRET` | **Yes** | Random string for signing JWT tokens. Heroku auto-generates this via `app.json`. Generate manually: `openssl rand -hex 64` |
+| `ADMIN_EMAIL` | No | Email for the auto-created admin account. Created on first boot if it doesn't exist. |
+| `ADMIN_PASSWORD` | No | Password for the auto-created admin account (min 6 chars). |
+| `PORT` | No | API port. Defaults to `3001`. Most platforms set this automatically. |
+| `NODE_ENV` | No | Set to `production` on live deployments. |
 
 ---
 
@@ -84,18 +101,90 @@ Configure these in your platform's secrets / environment panel — never commit 
 
 ---
 
+### Heroku (Website / Button)
+
+This is the easiest option — no CLI needed.
+
+#### Option A — One-Click Deploy Button
+
+Click the button at the top of this README:
+
+**[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/mrfr8nk/cybersec)**
+
+Heroku will:
+1. Fork/clone the repo from `github.com/mrfr8nk/cybersec`
+2. Show you a form to fill in env vars (JWT_SECRET is auto-generated)
+3. Provision a free PostgreSQL database automatically
+4. Build and deploy the app
+
+#### Option B — Manual deploy via Heroku Dashboard
+
+1. Go to [dashboard.heroku.com](https://dashboard.heroku.com) → **New** → **Create new app**
+2. Give it a name (e.g. `cybersecpro-myname`) and click **Create app**
+3. In the **Deploy** tab → **Deployment method** → **GitHub**
+4. Connect your GitHub account and search for `cybersec`
+5. Click **Connect** next to the repo
+6. Scroll down to **Manual deploy** → select `main` branch → **Deploy Branch**
+
+##### Add PostgreSQL (if not using MongoDB)
+
+In your app → **Resources** tab → **Add-ons** → search for **Heroku Postgres** → select **Essential 0** (free) → click **Submit Order Form**.
+
+This automatically sets `DATABASE_URL`.
+
+##### Add environment variables
+
+In your app → **Settings** tab → **Config Vars** → **Reveal Config Vars**:
+
+```
+JWT_SECRET    = (generate with: openssl rand -hex 64)
+NODE_ENV      = production
+ADMIN_EMAIL   = admin@yourdomain.com
+ADMIN_PASSWORD= your_secure_password
+
+# Optional — use MongoDB instead of PostgreSQL:
+MONGO_URL     = mongodb+srv://user:pass@cluster.mongodb.net/cybersecpro
+```
+
+##### Add Node 20 buildpack
+
+In **Settings** → **Buildpacks** → **Add buildpack** → select **heroku/nodejs** → **Save**.
+
+Also ensure `package.json` has:
+```json
+"engines": { "node": "20.x" }
+```
+
+##### Enable automatic deploys (optional)
+
+In the **Deploy** tab → **Automatic deploys** → **Enable Automatic Deploys**.  
+Every push to `main` will redeploy automatically.
+
+##### Session persistence on Heroku
+
+> **Important:** Heroku's filesystem is wiped on every dyno restart. WhatsApp sessions in `nexstore/pairing/` will be lost.
+
+Options:
+- **Heroku Managed Data** — contact Heroku support for a persistent volume
+- **Use MongoDB** — set `MONGO_URL` to a MongoDB Atlas cluster. The session *metadata* is tracked in MongoDB; the actual Baileys credential files still need a volume. For most use cases, users simply re-pair after a dyno restart (which happens ~daily on free/basic dynos)
+- **Upgrade to Standard dynos** — Standard dynos have persistent filesystem within a single dyno (though still reset on deploy)
+
+For production use with persistent sessions, **Railway** or a **VPS** is recommended.
+
+---
+
 ### Railway
 
-Railway is the recommended platform — it has native PostgreSQL, persistent volumes, and runs Node 20 by default.
+Railway is recommended for persistent sessions — it has native volumes, PostgreSQL, and Node 20 by default.
 
-#### Step 1 — Create a project from GitHub
+#### Step 1 — Create project from GitHub
 
-Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo** → select your repo.
+[railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo** → select `cybersec`.
 
-#### Step 2 — Add PostgreSQL
+#### Step 2 — Add PostgreSQL (skip if using MongoDB)
 
 Inside your project → **+ New** → **Database** → **Add PostgreSQL**.  
-Railway automatically injects `DATABASE_URL` into your service — no manual copy needed.
+`DATABASE_URL` is injected automatically.
 
 #### Step 3 — Add a persistent volume (required for sessions)
 
@@ -106,317 +195,148 @@ Your service → **Settings** → **Volumes** → **Add Volume**:
 | Mount path | `/app/nexstore` |
 | Size | 1 GB |
 
-Without this, WhatsApp session files are lost on every redeploy and users must re-pair.
-
 #### Step 4 — Set environment variables
 
-Your service → **Variables** → **Add Variable**:
+Your service → **Variables**:
 
 ```
-JWT_SECRET   = your_long_random_string
-NODE_ENV     = production
+JWT_SECRET    = (long random string)
+NODE_ENV      = production
+ADMIN_EMAIL   = admin@yourdomain.com
+ADMIN_PASSWORD= your_secure_password
+
+# Optional MongoDB:
+MONGO_URL     = mongodb+srv://...
 ```
 
 #### Step 5 — Pin Node.js to version 20
 
-Add to the root `package.json` (already present, verify it is there):
-
-```json
-"engines": {
-  "node": ">=20.0.0"
-}
-```
-
-Or add a `.nvmrc` file at the root:
-
+Add `.nvmrc` at the repo root:
 ```
 20
 ```
 
-#### Step 6 — Set the build + start command
-
-Your service → **Settings** → **Deploy**:
-
-- **Build Command:**
-  ```
-  npm install && cd client && npm install && npm run build && cd ..
-  ```
-- **Start Command:**
-  ```
-  node server/index.js
-  ```
-
-#### Step 7 — Serve the React build from Express
-
-Add the following block to `server/index.js` **after** all your `app.use('/api/...')` calls and **before** `initDb()`:
-
-```js
-const path = require('path');
-const clientDist = path.join(__dirname, '../client/dist');
-if (require('fs').existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
-}
+Or in Railway variables:
+```
+NIXPACKS_NODE_VERSION = 20
 ```
 
-#### Step 8 — Deploy
+#### Step 6 — Set build + start commands
 
-Push to `main` — Railway deploys automatically on every push.  
-Watch the build logs; a successful start prints:
-
+**Build Command:**
 ```
-✅ PostgreSQL tables ready
-🚀 CYBERSECPRO API running on port XXXX
-🔄 Sessions restored: X/X
+npm install && cd client && npm install && npm run build && cd ..
+```
+**Start Command:**
+```
+node server/index.js
 ```
 
 ---
 
 ### Render
 
-#### Step 1 — Create a Web Service
+#### Step 1 — Create Web Service
 
-[render.com](https://render.com) → **New** → **Web Service** → connect your repo.
+[render.com](https://render.com) → **New** → **Web Service** → connect `cybersec` repo.
 
 | Setting | Value |
 |---|---|
-| Environment | Node |
-| Branch | `main` |
 | Build Command | `npm install && cd client && npm install && npm run build && cd ..` |
 | Start Command | `node server/index.js` |
 | Instance Type | Starter (512 MB RAM minimum) |
 
-#### Step 2 — Add PostgreSQL
+#### Step 2 — Add PostgreSQL (skip if using MongoDB)
 
-**New** → **PostgreSQL** → create a database.  
-In your web service → **Environment** → add:
+**New** → **PostgreSQL** → copy **Internal Database URL** → paste as `DATABASE_URL` in your web service env.
 
-```
-DATABASE_URL = <paste Internal Database URL from the PostgreSQL service>
-```
-
-#### Step 3 — Add a persistent disk (required for sessions)
+#### Step 3 — Add persistent disk (required for sessions)
 
 Your web service → **Disks** → **Add Disk**:
 
 | Field | Value |
 |---|---|
-| Name | sessions |
 | Mount Path | `/opt/render/project/src/nexstore` |
 | Size | 1 GB |
 
-#### Step 4 — Set environment variables
-
-Your web service → **Environment**:
+#### Step 4 — Environment variables
 
 ```
-JWT_SECRET  = your_long_random_string
-NODE_ENV    = production
+JWT_SECRET    = (long random string)
+NODE_ENV      = production
+ADMIN_EMAIL   = admin@yourdomain.com
+ADMIN_PASSWORD= your_secure_password
 ```
 
 #### Step 5 — Pin Node version
 
-Add a `.node-version` file at the repo root:
-
+Add `.node-version` at repo root:
 ```
 20.11.0
-```
-
-#### Step 6 — Serve the React build from Express
-
-Same as Railway Step 7 above — add the static file serving block to `server/index.js`.
-
-#### Step 7 — Deploy
-
-Click **Create Web Service**. Render builds and deploys automatically.
-
----
-
-### Heroku
-
-> **Note:** Heroku's filesystem is **ephemeral** — files written to disk are wiped on every dyno restart. This is a serious limitation for WhatsApp sessions. See Step 5 for options. If persistent sessions are a priority, use Railway or a VPS instead.
-
-#### Step 1 — Install Heroku CLI and create an app
-
-```bash
-npm install -g heroku
-heroku login
-heroku create your-cybersecpro-app
-```
-
-#### Step 2 — Add PostgreSQL
-
-```bash
-heroku addons:create heroku-postgresql:essential-0
-# DATABASE_URL is set automatically
-```
-
-#### Step 3 — Set environment variables
-
-```bash
-heroku config:set JWT_SECRET="your_long_random_string"
-heroku config:set NODE_ENV=production
-heroku config:set NPM_CONFIG_PRODUCTION=false
-```
-
-#### Step 4 — Set Node version
-
-Ensure `package.json` at the root has:
-
-```json
-"engines": {
-  "node": "20.x",
-  "npm":  "9.x"
-}
-```
-
-#### Step 5 — Handle session persistence
-
-Since the Heroku filesystem is wiped on restart, choose one of these options:
-
-**Option A — Heroku Managed Data (paid)**  
-Contact Heroku support for a persistent volume addon and mount it at `nexstore`.
-
-**Option B — Use an external object store**  
-Replace Baileys' `useMultiFileAuthState` with a custom implementation that reads/writes credentials to AWS S3, Cloudflare R2, or similar. This is the recommended long-term approach for Heroku.
-
-**Option C — Switch platform**  
-Railway and Render both offer free-tier persistent disks. Switching takes under 10 minutes.
-
-#### Step 6 — Create a Procfile
-
-Create a file named `Procfile` at the repo root:
-
-```
-web: cd client && npm install && npm run build && cd .. && node server/index.js
-```
-
-#### Step 7 — Serve the React build from Express
-
-Same as Railway Step 7 — add the static file serving block to `server/index.js`.
-
-#### Step 8 — Deploy
-
-```bash
-git add .
-git commit -m "production setup"
-git push heroku main
-```
-
-View logs:
-
-```bash
-heroku logs --tail
 ```
 
 ---
 
 ### VPS (Ubuntu / Debian)
 
-A VPS gives you full control, a persistent filesystem, and no cold-start delays.
-
-#### Step 1 — Update and install Node.js 20
+#### Step 1 — Install Node.js 20
 
 ```bash
-sudo apt update && sudo apt upgrade -y
-
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
-
-node -v    # must print v20.x.x
+node -v   # must show v20.x.x
 ```
 
-#### Step 2 — Install PostgreSQL
+#### Step 2 — Install PostgreSQL (skip if using MongoDB)
 
 ```bash
 sudo apt install -y postgresql postgresql-contrib
 sudo systemctl enable --now postgresql
-
 sudo -u postgres psql <<'SQL'
-CREATE USER cybersecpro WITH PASSWORD 'strong_password_here';
+CREATE USER cybersecpro WITH PASSWORD 'strong_password';
 CREATE DATABASE cybersecpro OWNER cybersecpro;
-GRANT ALL PRIVILEGES ON DATABASE cybersecpro TO cybersecpro;
-\q
 SQL
 ```
 
-#### Step 3 — Clone the repo
+#### Step 3 — Clone and install
 
 ```bash
 cd /var/www
-sudo git clone https://github.com/youruser/cybersecpro.git
-sudo chown -R $USER:$USER cybersecpro
-cd cybersecpro
-```
-
-#### Step 4 — Install dependencies and build
-
-```bash
-# Root dependencies (Baileys, bot utilities)
+git clone https://github.com/mrfr8nk/cybersec
+cd cybersec
 npm install
-
-# Backend
 cd server && npm install && cd ..
-
-# Frontend — build for production
 cd client && npm install && npm run build && cd ..
 ```
 
-#### Step 5 — Create .env file
+#### Step 4 — Create .env
 
 ```bash
 nano .env
 ```
 
 ```env
-DATABASE_URL=postgresql://cybersecpro:strong_password_here@localhost:5432/cybersecpro
-JWT_SECRET=replace_with_a_very_long_random_string
+# Choose ONE database:
+MONGO_URL=mongodb+srv://user:pass@cluster.mongodb.net/cybersecpro
+# OR:
+DATABASE_URL=postgresql://cybersecpro:strong_password@localhost:5432/cybersecpro
+
+JWT_SECRET=replace_with_very_long_random_string
 NODE_ENV=production
 PORT=3001
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=your_secure_password
 ```
 
-Lock down the file:
-
-```bash
-chmod 600 .env
-```
-
-#### Step 6 — Serve the React build from Express
-
-Add to `server/index.js` after all `app.use('/api/...')` calls:
-
-```js
-const path = require('path');
-const clientDist = path.join(__dirname, '../client/dist');
-if (require('fs').existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
-}
-```
-
-#### Step 7 — Run with PM2
+#### Step 5 — Run with PM2
 
 ```bash
 sudo npm install -g pm2
-
-pm2 start server/index.js --name cybersecpro-api
-pm2 save
-pm2 startup    # run the printed command to enable auto-start on reboot
+pm2 start server/index.js --name cybersecpro
+pm2 save && pm2 startup
 ```
 
-Useful PM2 commands:
-
-```bash
-pm2 logs cybersecpro-api     # live logs
-pm2 restart cybersecpro-api  # restart
-pm2 status                   # check running status
-```
-
-#### Step 8 — Configure Nginx as a reverse proxy
+#### Step 6 — Nginx reverse proxy
 
 ```bash
 sudo apt install -y nginx
@@ -426,73 +346,80 @@ sudo nano /etc/nginx/sites-available/cybersecpro
 ```nginx
 server {
     listen 80;
-    server_name yourdomain.com www.yourdomain.com;
+    server_name yourdomain.com;
 
-    # Pairing requests can take up to 40 seconds — increase timeouts
     proxy_read_timeout    60s;
     proxy_connect_timeout 60s;
-    proxy_send_timeout    60s;
 
     location / {
         proxy_pass         http://127.0.0.1:3001;
         proxy_http_version 1.1;
-        proxy_set_header   Upgrade           $http_upgrade;
-        proxy_set_header   Connection        'upgrade';
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
 }
 ```
 
-Enable the site:
-
 ```bash
 sudo ln -s /etc/nginx/sites-available/cybersecpro /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl restart nginx
+sudo certbot --nginx -d yourdomain.com   # free HTTPS
 ```
-
-#### Step 9 — Enable HTTPS (free with Let's Encrypt)
-
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
-sudo systemctl reload nginx
-```
-
-Certificates renew automatically every 90 days.
 
 ---
 
 ## Post-Deployment Checklist
 
-Run through these after every fresh deployment:
-
-- [ ] `GET /api/health` returns `{ "status": "CYBERSECPRO API Online" }`
-- [ ] Server logs show `✅ PostgreSQL tables ready`
-- [ ] Server logs show `🔄 Sessions restored: X/X` ~5 seconds after boot
-- [ ] Sign up for a new account at `/signup`
-- [ ] Log in and confirm the dashboard loads
+- [ ] `GET /api/health` returns `{ "status": "CYBERSECPRO API Online", "db": "MongoDB" }` or `"db": "PostgreSQL"`
+- [ ] Logs show `✅ PostgreSQL tables ready` or `✅ MongoDB connected`
+- [ ] If `ADMIN_EMAIL`+`ADMIN_PASSWORD` were set, logs show `✅ Admin account created: ...`
+- [ ] Logs show `🔄 Sessions restored: X/X` ~5 seconds after boot
+- [ ] Sign up for a test account at `/signup`
+- [ ] Log in — dashboard loads correctly
 - [ ] Link a WhatsApp number — enter number (country code, no `+`), paste pairing code on phone
-- [ ] Confirm bot sends the welcome message after pairing
-- [ ] Restart the service — bot should reconnect automatically without re-pairing
+- [ ] Bot sends welcome message after linking
+- [ ] Restart the service — bot reconnects without re-pairing (requires persistent volume/disk)
 
 ---
 
 ## Making a User an Admin
 
-SSH into your server or open a shell in your platform's dashboard, then run from the project root:
+### Method 1 — Environment variable (recommended)
+
+Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` before first boot. The admin account is created (or promoted) automatically.
+
+### Method 2 — Shell command
+
+Open a shell in your platform's dashboard (Heroku → **More** → **Run console**, Railway → **Shell** tab):
 
 ```bash
 node -e "
 require('dotenv').config();
-const { Pool } = require('./server/node_modules/pg');
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-pool.query(\"UPDATE users SET role = 'admin' WHERE email = 'your@email.com'\")
-  .then(() => { console.log('Admin role granted.'); process.exit(0); })
-  .catch(err => { console.error(err.message); process.exit(1); });
+const svc = require('./server/db-service');
+const { initDb } = require('./server/db');
+initDb().then(async () => {
+  await svc.setAdminRole('USER_ID_HERE');
+  console.log('Done');
+  process.exit(0);
+});
+"
+```
+
+Or promote by email:
+
+```bash
+node -e "
+require('dotenv').config();
+const { initDb } = require('./server/db');
+const svc = require('./server/db-service');
+initDb().then(async () => {
+  const user = await svc.findUserByEmail('user@example.com');
+  if (!user) return console.log('User not found');
+  await svc.setAdminRole(user.id);
+  console.log('Admin role granted to', user.email);
+  process.exit(0);
+});
 "
 ```
 
@@ -503,80 +430,49 @@ pool.query(\"UPDATE users SET role = 'admin' WHERE email = 'your@email.com'\")
 ### `Cannot find module '@whiskeysockets/baileys'`
 
 You are running Node.js 18 or below. Upgrade to Node 20:
-
-```bash
-node -v    # check current version
+```
+NIXPACKS_NODE_VERSION=20   ← Railway
+.nvmrc → "20"              ← Render / Railway
+engines.node → "20.x"     ← package.json for Heroku
 ```
 
-On Railway/Render, set `NIXPACKS_NODE_VERSION=20` or add `.nvmrc` with value `20`.  
-On VPS, reinstall Node using the NodeSource script in Step 1 of the VPS guide.
+### Pairing code never arrives
 
----
+1. Enter number with country code, no `+`, no spaces (e.g. `263776046121`)
+2. If behind Nginx, ensure `proxy_read_timeout 60s` — the request can take up to 40 seconds
+3. WhatsApp rate-limits — wait 2 minutes and retry
 
-### Pairing code never arrives / request times out
+### Sessions lost after restart
 
-1. Check logs for `[Pairing]` prefixed errors
-2. Enter the number with country code only — no `+`, no spaces, no dashes (e.g. `263776046121`)
-3. Confirm `nexstore/pairing/` exists and is writable (`ls -la nexstore/`)
-4. WhatsApp rate-limits code requests — wait 2 minutes and try again
-5. If running behind Nginx, ensure `proxy_read_timeout` is at least `60s`
+`nexstore/pairing/` is on ephemeral storage. Mount a persistent volume/disk at that path (see each platform's guide). On Heroku, daily dyno restarts will clear sessions unless a persistent addon is used.
 
----
+### Frontend shows blank page
 
-### Sessions lost after every restart / redeploy
-
-`nexstore/pairing/` is on ephemeral storage. Symptoms: users must re-pair after every restart.
-
-- **Railway** — add a Volume mounted at `/app/nexstore`
-- **Render** — add a Disk mounted at `/opt/render/project/src/nexstore`
-- **Heroku** — switch to Railway/Render or implement S3-backed session storage
-- **VPS** — the local filesystem is already persistent; no action needed
-
----
-
-### App crashes with `Reached heap limit` / out of memory
-
-Minimum recommended RAM is **512 MB**. With multiple active WhatsApp sessions, 1 GB is safer.
-
-Add swap on a VPS to give breathing room:
-
-```bash
-sudo fallocate -l 1G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile && sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-```
-
----
-
-### Database connection refused
-
-Test the connection directly:
-
-```bash
-node -e "
-require('dotenv').config();
-const { Pool } = require('./server/node_modules/pg');
-new Pool({ connectionString: process.env.DATABASE_URL })
-  .query('SELECT NOW()')
-  .then(r => console.log('Connected:', r.rows[0].now))
-  .catch(e => console.error('Failed:', e.message));
-"
-```
-
-Common causes: wrong `DATABASE_URL`, PostgreSQL not running, firewall blocking port 5432.
-
----
-
-### Frontend shows a blank white page
-
-The React app has not been built. Run:
-
+Build the React app first:
 ```bash
 cd client && npm install && npm run build
 ```
+The built files go to `client/dist/` — Express serves them automatically if that folder exists.
 
-Then confirm Express is serving `client/dist` — see the "Serve the React build from Express" step in your platform guide.
+### Database connection error
+
+Test your connection:
+```bash
+# PostgreSQL
+node -e "require('dotenv').config(); const {Pool}=require('./server/node_modules/pg'); new Pool({connectionString:process.env.DATABASE_URL}).query('SELECT NOW()').then(r=>console.log('OK',r.rows[0])).catch(e=>console.error(e.message))"
+
+# MongoDB
+node -e "require('dotenv').config(); const m=require('mongoose'); m.connect(process.env.MONGO_URL).then(()=>console.log('MongoDB OK')).catch(e=>console.error(e.message))"
+```
+
+### `FATAL ERROR: Reached heap limit`
+
+Minimum RAM: **512 MB**. Add swap on VPS:
+```bash
+sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
 
 ---
 

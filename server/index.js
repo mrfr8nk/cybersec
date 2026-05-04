@@ -1,67 +1,96 @@
 require('dotenv').config();
 
 // Prevent pair.js background errors from crashing the API server
-process.on('uncaughtException', err => {
-  console.error('[Server] Uncaught exception (non-fatal):', err.message);
-});
-process.on('unhandledRejection', err => {
-  console.error('[Server] Unhandled rejection (non-fatal):', err?.message || err);
-});
+process.on('uncaughtException',  err => console.error('[Server] Uncaught exception (non-fatal):', err.message));
+process.on('unhandledRejection', err => console.error('[Server] Unhandled rejection (non-fatal):', err?.message || err));
 
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
+const path        = require('path');
+const fs          = require('fs');
+const express     = require('express');
+const cors        = require('cors');
+const helmet      = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
-const rateLimit = require('express-rate-limit');
-const { initDb } = require('./db');
+const rateLimit   = require('express-rate-limit');
+const bcrypt      = require('bcryptjs');
 
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/user');
+const { initDb }  = require('./db');
+const svc         = require('./db-service');
+
+const authRoutes    = require('./routes/auth');
+const userRoutes    = require('./routes/user');
 const numbersRoutes = require('./routes/numbers');
-const adminRoutes = require('./routes/admin');
+const adminRoutes   = require('./routes/admin');
 const pairingRoutes = require('./routes/pairing');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3001;
 
-// Trust Replit's proxy
 app.set('trust proxy', 1);
 
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(mongoSanitize());
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: { error: 'Too many requests, please try again later.' }
-});
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { error: 'Too many auth requests, please try again later.' }
-});
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, message: { error: 'Too many requests, please try again later.' } });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { error: 'Too many auth requests, please try again later.' } });
 
-app.use('/api/', limiter);
+app.use('/api/',      limiter);
 app.use('/api/auth/', authLimiter);
 
-app.use(cors({
-  origin: '*',
-  credentials: true
-}));
-
+app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10kb' }));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/user', userRoutes);
+// ── API routes ──────────────────────────────────────────────────────────────
+app.use('/api/auth',    authRoutes);
+app.use('/api/user',    userRoutes);
 app.use('/api/numbers', numbersRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin',   adminRoutes);
 app.use('/api/pairing', pairingRoutes);
 
-app.get('/api/health', (req, res) => res.json({ status: 'CYBERSECPRO API Online', db: 'PostgreSQL', timestamp: new Date() }));
+app.get('/api/health', (req, res) =>
+  res.json({ status: 'CYBERSECPRO API Online', db: process.env.MONGO_URL ? 'MongoDB' : 'PostgreSQL', timestamp: new Date() })
+);
 
+// ── Serve compiled React frontend (production) ──────────────────────────────
+const clientDist = path.join(__dirname, '../client/dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+}
+
+// ── Auto-create admin from env vars ────────────────────────────────────────
+async function ensureAdminAccount() {
+  const email    = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email || !password) return;
+
+  try {
+    let user = await svc.findUserByEmail(email);
+    if (!user) {
+      // Derive a username from the email local part, ensure uniqueness
+      let username = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 28) || 'admin';
+      const existing = await svc.findUserByUsername(username, null);
+      if (existing) username = username + '_admin';
+
+      user = await svc.createUser(username, email, password);
+      console.log(`✅ Admin account created: ${email} (username: ${username})`);
+    }
+    if (user.role !== 'admin') {
+      await svc.setAdminRole(user.id);
+      console.log(`✅ Admin role granted to: ${email}`);
+    }
+  } catch (err) {
+    console.error('⚠️  Admin auto-create failed:', err.message);
+  }
+}
+
+// ── Boot sequence ───────────────────────────────────────────────────────────
 initDb()
-  .then(() => {
-    app.listen(PORT, '0.0.0.0', () => console.log(`🚀 CYBERSECPRO API running on port ${PORT}`));
+  .then(async () => {
+    await ensureAdminAccount();
+
+    app.listen(PORT, '0.0.0.0', () =>
+      console.log(`🚀 CYBERSECPRO API running on port ${PORT}`)
+    );
 
     // Reconnect all persisted WhatsApp sessions after a short boot delay
     setTimeout(async () => {
