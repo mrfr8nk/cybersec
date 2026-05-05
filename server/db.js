@@ -1,34 +1,44 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const { Pool } = require('pg');
 
 // ── Connection priority ────────────────────────────────────────────────────
-// 1. MONGO_URL env var          → MongoDB (Mongoose)
-// 2. DATABASE_URL env var       → PostgreSQL (pg)
-// 3. Hardcoded Replit fallback  → PostgreSQL on Replit's internal network
-//    (this fallback only works when the server runs inside Replit itself)
-const REPLIT_DB_FALLBACK = 'postgresql://postgres:password@helium/heliumdb?sslmode=disable';
+// 1. MONGO_URL env var     → MongoDB (Mongoose)  ← recommended for Heroku
+// 2. DATABASE_URL env var  → PostgreSQL (pg)      ← for VPS / Railway / Render
+// 3. Replit internal URL   → PostgreSQL fallback  ← ONLY works inside Replit
+//
+// On Heroku: set MONGO_URL. No PostgreSQL addon needed.
+const MONGO_URL = process.env.MONGO_URL;
+const PG_URL    = process.env.DATABASE_URL ||
+  (process.env.NODE_ENV !== 'production'
+    ? 'postgresql://postgres:password@helium/heliumdb?sslmode=disable'
+    : null);
 
-const MONGO_URL   = process.env.MONGO_URL;
-const PG_URL      = process.env.DATABASE_URL || REPLIT_DB_FALLBACK;
-
-let _pool         = null;
-let _mongoMode    = false;
+let _pool      = null;
+let _mongoMode = false;
 
 const isMongoMode = () => _mongoMode;
 const getPool     = () => _pool;
 
 const initDb = async () => {
+  // ── MongoDB ──────────────────────────────────────────────────────────────
   if (MONGO_URL) {
     _mongoMode = true;
-    await mongoose.connect(MONGO_URL, {
-      serverSelectionTimeoutMS: 10000,
-    });
+    await mongoose.connect(MONGO_URL, { serverSelectionTimeoutMS: 10000 });
     console.log('✅ MongoDB connected');
     return;
   }
 
-  // ── PostgreSQL mode ──────────────────────────────────────────────────────
+  // ── PostgreSQL ───────────────────────────────────────────────────────────
+  if (!PG_URL) {
+    console.error('');
+    console.error('❌ No database configured!');
+    console.error('   Set MONGO_URL (MongoDB Atlas — free) or DATABASE_URL (PostgreSQL).');
+    console.error('   On Heroku: add MONGO_URL in Settings → Config Vars.');
+    console.error('');
+    process.exit(1);
+  }
+
+  const { Pool } = require('pg');
   _pool = new Pool({
     connectionString: PG_URL,
     ssl: PG_URL.includes('sslmode=require') ? { rejectUnauthorized: false } : false,
@@ -51,7 +61,6 @@ const initDb = async () => {
         created_at        TIMESTAMPTZ  DEFAULT NOW()
       )
     `);
-
     await client.query(`
       CREATE TABLE IF NOT EXISTS linked_numbers (
         id          SERIAL PRIMARY KEY,
@@ -63,7 +72,6 @@ const initDb = async () => {
         created_at  TIMESTAMPTZ DEFAULT NOW()
       )
     `);
-
     await client.query(`
       CREATE TABLE IF NOT EXISTS bot_sessions (
         id           SERIAL PRIMARY KEY,
@@ -74,7 +82,6 @@ const initDb = async () => {
         created_at   TIMESTAMPTZ DEFAULT NOW()
       )
     `);
-
     console.log('✅ PostgreSQL tables ready');
   } finally {
     client.release();

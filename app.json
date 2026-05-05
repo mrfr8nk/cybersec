@@ -5,19 +5,15 @@
   "keywords": ["node", "whatsapp", "saas", "bot", "baileys"],
   "env": {
     "MONGO_URL": {
-      "description": "MongoDB connection string (recommended). Get a free cluster at mongodb.com/atlas. Example: mongodb+srv://user:pass@cluster.mongodb.net/cybersecpro. If left blank, the Heroku PostgreSQL addon is used instead.",
-      "required": false
-    },
-    "DATABASE_URL": {
-      "description": "PostgreSQL connection string. Auto-injected by the Heroku PostgreSQL addon — leave blank.",
-      "required": false
+      "description": "MongoDB connection string — REQUIRED. Get a FREE cluster at mongodb.com/atlas → Create cluster → Connect → Drivers → copy the URI. Replace <password> with your password. Example: mongodb+srv://admin:mypassword@cluster0.xxxxx.mongodb.net/cybersecpro",
+      "required": true
     },
     "JWT_SECRET": {
-      "description": "Secret key for signing JWT auth tokens. Auto-generated if left blank.",
+      "description": "Secret key for signing JWT auth tokens. Auto-generated — you can leave this blank.",
       "generator": "secret"
     },
     "ADMIN_EMAIL": {
-      "description": "Email for the auto-created admin account on first boot.",
+      "description": "Email for the auto-created admin account. Created on first boot.",
       "value": "admin@cybersecpro.com",
       "required": false
     },
@@ -26,7 +22,7 @@
       "required": false
     },
     "NPM_CONFIG_PRODUCTION": {
-      "description": "Must be false so devDependencies are available during the React build step.",
+      "description": "Must be false so devDependencies are installed for the React build step.",
       "value": "false"
     },
     "NODE_ENV": {
@@ -34,12 +30,6 @@
       "value": "production"
     }
   },
-  "addons": [
-    {
-      "plan": "heroku-postgresql:essential-0",
-      "as": "DATABASE"
-    }
-  ],
   "buildpacks": [
     { "url": "heroku/nodejs" }
   ],
