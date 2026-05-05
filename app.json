@@ -5,25 +5,29 @@
   "keywords": ["node", "whatsapp", "saas", "bot", "baileys"],
   "env": {
     "MONGO_URL": {
-      "description": "MongoDB connection string (recommended). Get a free cluster at mongodb.com/atlas. Example: mongodb+srv://user:pass@cluster.mongodb.net/cybersecpro. If left blank, the Heroku PostgreSQL addon (DATABASE_URL) is used instead.",
+      "description": "MongoDB connection string (recommended). Get a free cluster at mongodb.com/atlas. Example: mongodb+srv://user:pass@cluster.mongodb.net/cybersecpro. If left blank, the Heroku PostgreSQL addon is used instead.",
       "required": false
     },
     "DATABASE_URL": {
-      "description": "PostgreSQL connection string. Auto-injected by the Heroku PostgreSQL addon below — leave blank unless you are using an external PostgreSQL instance.",
+      "description": "PostgreSQL connection string. Auto-injected by the Heroku PostgreSQL addon — leave blank.",
       "required": false
     },
     "JWT_SECRET": {
-      "description": "Secret key for signing JWT auth tokens. Leave blank to auto-generate a secure random value.",
+      "description": "Secret key for signing JWT auth tokens. Auto-generated if left blank.",
       "generator": "secret"
     },
     "ADMIN_EMAIL": {
-      "description": "Email address for the auto-created admin account. The account is created on first boot if it does not exist.",
+      "description": "Email for the auto-created admin account on first boot.",
       "value": "admin@cybersecpro.com",
       "required": false
     },
     "ADMIN_PASSWORD": {
-      "description": "Password for the auto-created admin account (min 6 characters). Required if ADMIN_EMAIL is set.",
+      "description": "Password for the auto-created admin account (min 6 chars).",
       "required": false
+    },
+    "NPM_CONFIG_PRODUCTION": {
+      "description": "Must be false so devDependencies are available during the React build step.",
+      "value": "false"
     },
     "NODE_ENV": {
       "description": "Runtime environment.",
@@ -42,10 +46,10 @@
   "formation": {
     "web": {
       "quantity": 1,
-      "size": "basic"
+      "size": "eco"
     }
   },
   "scripts": {
-    "postdeploy": "echo 'CyberSecPro deployed. Open the app URL to get started.'"
+    "postdeploy": "echo 'CyberSecPro deployed successfully'"
   }
 }

@@ -8,7 +8,7 @@
     "dev": "nodemon server/index.js",
     "bot": "node bot.js",
     "test": "node --check index.js",
-    "heroku-postbuild": "cd client && npm install && npm run build && cd .."
+    "heroku-postbuild": "npm install --prefix server && npm install --include=dev --prefix client && npm run build --prefix client"
   },
   "keywords": [
     "whiskeysockets",
@@ -21,7 +21,8 @@
   "author": "Nexus",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x",
+    "npm": ">=9.0.0"
   },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
