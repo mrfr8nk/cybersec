@@ -67,3 +67,7 @@ externalPort = 3002
 [userenv.shared]
 PORT = "3001"
 NODE_ENV = "development"
+
+[deployment]
+deploymentTarget = "cloudrun"
+run = ["sh", "-c", "/nix/store/1lagpgadaybvs1n2312gysg2phjk89y8-nodejs-20.20.0-wrapped/bin/node $file"]
