@@ -67,4 +67,3 @@ externalPort = 3002
 [userenv.shared]
 PORT = "3001"
 NODE_ENV = "development"
-JWT_SECRET = "cybersecpro_jwt_secret_replit_2024"

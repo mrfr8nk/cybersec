@@ -7,9 +7,6 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
-    "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.17.16",
-    "awesome-phonenumber": "^7.8.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -21,7 +18,7 @@
     "mongoose": "^8.4.1",
     "node-cache": "^5.1.2",
     "pg": "^8.20.0",
-    "pino": "^10.3.1",
+    "pino": "^9.5.0",
     "validator": "^13.12.0"
   },
   "devDependencies": {

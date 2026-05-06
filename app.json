@@ -25,6 +25,14 @@
       "description": "Must be false so devDependencies are installed for the React build step.",
       "value": "false"
     },
+    "NPM_CONFIG_OPTIONAL": {
+      "description": "Skip optional dependencies (heavy bot libs not needed on server).",
+      "value": "false"
+    },
+    "NPM_CONFIG_LEGACY_PEER_DEPS": {
+      "description": "Use legacy peer deps resolution to avoid install conflicts.",
+      "value": "true"
+    },
     "NODE_ENV": {
       "description": "Runtime environment.",
       "value": "production"
