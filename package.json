@@ -8,7 +8,8 @@
     "dev": "nodemon server/index.js",
     "bot": "node bot.js",
     "test": "node --check index.js",
-    "heroku-postbuild": "npm install --no-optional --legacy-peer-deps --prefix server && npm_config_optional=true npm install --include=dev --legacy-peer-deps --prefix client && npm run build --prefix client"
+    "build": "npm install --legacy-peer-deps --prefix server && npm install --legacy-peer-deps --prefix client && npm run build --prefix client",
+    "heroku-postbuild": "npm install --legacy-peer-deps --prefix server && npm install --legacy-peer-deps --prefix client && npm run build --prefix client"
   },
   "keywords": [
     "whiskeysockets",
@@ -22,10 +23,9 @@
   "license": "MIT",
   "engines": {
     "node": "20.x",
-    "npm": "9.x"
+    "npm": ">=9.x"
   },
-  "dependencies": {},
-  "optionalDependencies": {
+  "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
     "@colors/colors": "^1.5.0",
     "@distube/ytdl-core": "^4.14.4",

@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm install --legacy-peer-deps && npm run build"
+
+[deploy]
+startCommand = "node server/index.js"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+[environment]
+NODE_ENV = "production"
+NPM_CONFIG_LEGACY_PEER_DEPS = "true"

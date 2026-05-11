@@ -5,16 +5,19 @@
   "keywords": ["node", "whatsapp", "saas", "bot", "baileys"],
   "env": {
     "MONGO_URL": {
-      "description": "MongoDB connection string — REQUIRED. Get a FREE cluster at mongodb.com/atlas → Create cluster → Connect → Drivers → copy the URI. Replace <password> with your password. Example: mongodb+srv://admin:mypassword@cluster0.xxxxx.mongodb.net/cybersecpro",
+      "description": "MongoDB connection string — REQUIRED. Get a FREE cluster at mongodb.com/atlas",
       "required": true
     },
     "JWT_SECRET": {
-      "description": "Secret key for signing JWT auth tokens. Auto-generated — you can leave this blank.",
+      "description": "Secret key for signing JWT auth tokens.",
       "generator": "secret"
     },
+    "TELEGRAM_BOT_TOKEN": {
+      "description": "Your Telegram bot token from @BotFather",
+      "required": false
+    },
     "ADMIN_EMAIL": {
-      "description": "Email for the auto-created admin account. Created on first boot.",
-      "value": "admin@cybersecpro.com",
+      "description": "Email for the auto-created admin account.",
       "required": false
     },
     "ADMIN_PASSWORD": {
