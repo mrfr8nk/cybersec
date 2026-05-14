@@ -4,7 +4,7 @@ import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 
 const LOGO = 'https://media.mrfrankofc.gleeze.com/media/IMG-20260503-WA0094.jpg';
 const CONTACT = '+923417022212';
-const INSTAGRAM = 'https://www.instagram.com/msarim21';
+const INSTAGRAM = 'https://www.instagram.com/cyber_sec_pro';
 
 const MatrixRain = () => {
   const canvasRef = useRef(null);
@@ -572,7 +572,7 @@ export default function Landing() {
             <a href={INSTAGRAM} target="_blank" rel="noreferrer"
               className="transition-colors duration-200 hover:text-[#00f5ff]"
               style={{ color: 'rgba(0,245,255,0.6)' }}>
-              @msarim21
+              cyber_sec_pro
             </a>
           </div>
         </div>
