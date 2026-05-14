@@ -77,6 +77,7 @@
     "mathjs": "^13.2.2",
     "moment-timezone": "^0.5.46",
     "mongoose": "^8.8.1",
+    "multer": "^1.4.5-lts.1",
     "mumaker": "^1.0.0",
     "nik-parser": "^1.0.1",
     "node-cache": "^5.1.2",

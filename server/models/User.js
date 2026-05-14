@@ -33,6 +33,19 @@ const userSchema = new mongoose.Schema({
     enum: ['free', 'pro', 'enterprise'],
     default: 'free'
   },
+  trialExpiresAt: {
+    type: Date,
+    default: null
+  },
+  upgradeRequest: {
+    type: String,
+    enum: ['none', 'pro', 'enterprise'],
+    default: 'none'
+  },
+  upgradeRequestAt: {
+    type: Date,
+    default: null
+  },
   banned: {
     type: Boolean,
     default: false

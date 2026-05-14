@@ -6,6 +6,7 @@ const {
   findUserByEmailOrUsername,
   findUserByEmail,
   createUser,
+  setTrialExpiry,
 } = require('../db-service');
 const { generateToken } = require('../middleware/auth');
 
@@ -24,6 +25,11 @@ router.post('/signup', async (req, res) => {
     if (existing) return res.status(409).json({ error: 'Username or email already taken.' });
 
     const user = await createUser(username, email, password);
+
+    // Set 24-hour free trial
+    const trialExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await setTrialExpiry(user.id, trialExpiry);
+
     const token = generateToken(user.id);
     res.status(201).json({
       token,
@@ -33,6 +39,7 @@ router.post('/signup', async (req, res) => {
         email:            user.email,
         role:             user.role,
         subscriptionPlan: user.subscription_plan,
+        trialExpiresAt:   trialExpiry.toISOString(),
         createdAt:        user.created_at,
       },
     });
@@ -49,7 +56,6 @@ router.post('/login', async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ error: 'Email and password are required.' });
 
-    // Always request password field (MongoDB hides it by default)
     const user = await findUserByEmail(email, true);
     if (!user) return res.status(401).json({ error: 'Invalid credentials.' });
 
@@ -67,6 +73,8 @@ router.post('/login', async (req, res) => {
         email:            user.email,
         role:             user.role,
         subscriptionPlan: user.subscription_plan,
+        trialExpiresAt:   user.trial_expires_at || null,
+        upgradeRequest:   user.upgrade_request || 'none',
         createdAt:        user.created_at,
       },
     });

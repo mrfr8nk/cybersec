@@ -1,19 +1,8 @@
 'use strict';
 
-/**
- * Unified database service.
- * Automatically routes every operation to MongoDB (Mongoose) or
- * PostgreSQL (pg) depending on which URL is configured.
- *
- * All returned objects use a consistent shape regardless of DB:
- *   User   → { id, username, email, password?, role, subscription_plan, banned, last_active, created_at }
- *   Number → { _id, number, botName, status, ownerId, lastActive, createdAt }
- */
-
 const bcrypt = require('bcryptjs');
 const { isMongoMode, getPool } = require('./db');
 
-// ── Lazy model loader (Mongoose models only imported when MONGO_URL is set) ─
 function M() {
   return {
     User:         require('./models/User'),
@@ -22,7 +11,6 @@ function M() {
   };
 }
 
-// ── Normalizers ─────────────────────────────────────────────────────────────
 function normUser(u) {
   if (!u) return null;
   const o = u.toObject ? u.toObject({ getters: true }) : u;
@@ -30,9 +18,12 @@ function normUser(u) {
     id:                (o._id || o.id) ? String(o._id || o.id) : undefined,
     username:          o.username,
     email:             o.email,
-    password:          o.password,           // may be undefined (not selected)
+    password:          o.password,
     role:              o.role,
     subscription_plan: o.subscriptionPlan || o.subscription_plan,
+    trial_expires_at:  o.trialExpiresAt   || o.trial_expires_at  || null,
+    upgrade_request:   o.upgradeRequest   || o.upgrade_request   || 'none',
+    upgrade_request_at: o.upgradeRequestAt || o.upgrade_request_at || null,
     banned:            o.banned,
     last_active:       o.lastActive  || o.last_active,
     created_at:        o.createdAt   || o.created_at,
@@ -53,7 +44,6 @@ function normNumber(n) {
   };
 }
 
-// ── Pool shorthand ───────────────────────────────────────────────────────────
 const pg = () => getPool();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -110,7 +100,7 @@ async function createUser(username, email, rawPassword) {
   if (isMongoMode()) {
     const { User } = M();
     const user = new User({ username, email: email.toLowerCase(), password: rawPassword });
-    await user.save();   // Mongoose pre-save hook hashes the password
+    await user.save();
     return normUser(user);
   }
   const hashed = await bcrypt.hash(rawPassword, 12);
@@ -171,14 +161,84 @@ async function deleteUser(id) {
 async function updateUserPlan(id, plan) {
   if (isMongoMode()) {
     const { User } = M();
-    const u = await User.findByIdAndUpdate(id, { subscriptionPlan: plan }, { new: true });
+    const u = await User.findByIdAndUpdate(id, { subscriptionPlan: plan, upgradeRequest: 'none' }, { new: true });
     return u ? normUser(u) : null;
   }
   const { rows } = await pg().query(
-    'UPDATE users SET subscription_plan = $1 WHERE id = $2 RETURNING id, username, email, subscription_plan',
+    "UPDATE users SET subscription_plan = $1, upgrade_request = 'none' WHERE id = $2 RETURNING id, username, email, subscription_plan",
     [plan, id]
   );
   return rows[0] || null;
+}
+
+async function setTrialExpiry(id, expiresAt) {
+  if (isMongoMode()) {
+    const { User } = M();
+    await User.findByIdAndUpdate(id, { trialExpiresAt: expiresAt });
+    return;
+  }
+  await pg().query('UPDATE users SET trial_expires_at = $1 WHERE id = $2', [expiresAt, id]);
+}
+
+async function requestUpgrade(id, plan) {
+  if (isMongoMode()) {
+    const { User } = M();
+    await User.findByIdAndUpdate(id, { upgradeRequest: plan, upgradeRequestAt: new Date() });
+    return;
+  }
+  await pg().query(
+    'UPDATE users SET upgrade_request = $1, upgrade_request_at = NOW() WHERE id = $2',
+    [plan, id]
+  );
+}
+
+async function getPendingUpgradeRequests() {
+  if (isMongoMode()) {
+    const { User } = M();
+    const users = await User.find({ upgradeRequest: { $in: ['pro', 'enterprise'] } }).sort({ upgradeRequestAt: -1 });
+    return users.map(u => ({
+      id: String(u._id), username: u.username, email: u.email,
+      subscriptionPlan: u.subscriptionPlan,
+      upgradeRequest: u.upgradeRequest,
+      upgradeRequestAt: u.upgradeRequestAt,
+    }));
+  }
+  const { rows } = await pg().query(
+    `SELECT id, username, email, subscription_plan, upgrade_request, upgrade_request_at
+     FROM users WHERE upgrade_request IN ('pro','enterprise')
+     ORDER BY upgrade_request_at DESC`
+  );
+  return rows.map(r => ({
+    id: r.id, username: r.username, email: r.email,
+    subscriptionPlan: r.subscription_plan,
+    upgradeRequest: r.upgrade_request,
+    upgradeRequestAt: r.upgrade_request_at,
+  }));
+}
+
+async function approveUpgrade(id, plan) {
+  if (isMongoMode()) {
+    const { User } = M();
+    const u = await User.findByIdAndUpdate(id, { subscriptionPlan: plan, upgradeRequest: 'none' }, { new: true });
+    return u ? normUser(u) : null;
+  }
+  const { rows } = await pg().query(
+    "UPDATE users SET subscription_plan = $1, upgrade_request = 'none', upgrade_request_at = NULL WHERE id = $2 RETURNING id, username, email, subscription_plan",
+    [plan, id]
+  );
+  return rows[0] || null;
+}
+
+async function rejectUpgrade(id) {
+  if (isMongoMode()) {
+    const { User } = M();
+    await User.findByIdAndUpdate(id, { upgradeRequest: 'none', upgradeRequestAt: null });
+    return;
+  }
+  await pg().query(
+    "UPDATE users SET upgrade_request = 'none', upgrade_request_at = NULL WHERE id = $1",
+    [id]
+  );
 }
 
 async function getAllUsers(search, page, limit) {
@@ -196,12 +256,12 @@ async function getAllUsers(search, page, limit) {
   }
   let query, countQuery, params, countParams;
   if (search) {
-    query      = `SELECT id,username,email,role,subscription_plan,banned,last_active,created_at FROM users WHERE username ILIKE $1 OR email ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
+    query      = `SELECT id,username,email,role,subscription_plan,trial_expires_at,upgrade_request,upgrade_request_at,banned,last_active,created_at FROM users WHERE username ILIKE $1 OR email ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
     countQuery = 'SELECT COUNT(*) FROM users WHERE username ILIKE $1 OR email ILIKE $1';
     params      = [`%${search}%`, parseInt(limit), offset];
     countParams = [`%${search}%`];
   } else {
-    query      = `SELECT id,username,email,role,subscription_plan,banned,last_active,created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`;
+    query      = `SELECT id,username,email,role,subscription_plan,trial_expires_at,upgrade_request,upgrade_request_at,banned,last_active,created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`;
     countQuery = 'SELECT COUNT(*) FROM users';
     params      = [parseInt(limit), offset];
     countParams = [];
@@ -389,14 +449,48 @@ async function getActiveBotSessions() {
   return rows.map(r => r.number);
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SITE SETTINGS (for audio and other config)
+// ════════════════════════════════════════════════════════════════════════════
+
+async function getSiteSetting(key) {
+  if (isMongoMode()) {
+    try {
+      const SiteSettings = require('./models/SiteSettings');
+      const doc = await SiteSettings.findOne({ key });
+      return doc ? doc.value : null;
+    } catch { return null; }
+  }
+  try {
+    const { rows } = await pg().query('SELECT value FROM site_settings WHERE key = $1', [key]);
+    return rows[0] ? rows[0].value : null;
+  } catch { return null; }
+}
+
+async function setSiteSetting(key, value) {
+  if (isMongoMode()) {
+    try {
+      const SiteSettings = require('./models/SiteSettings');
+      await SiteSettings.findOneAndUpdate({ key }, { key, value }, { upsert: true });
+    } catch { }
+    return;
+  }
+  try {
+    await pg().query(
+      `INSERT INTO site_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+      [key, value]
+    );
+  } catch { }
+}
+
 module.exports = {
-  // Users
   findUserByEmail, findUserById, findUserByEmailOrUsername, findUserByUsername,
   createUser, updateUserLastActive, updateUsername, setAdminRole,
   banUser, deleteUser, updateUserPlan, getAllUsers, getStats,
-  // Numbers
+  setTrialExpiry, requestUpgrade, getPendingUpgradeRequests, approveUpgrade, rejectUpgrade,
   getNumbersByOwner, countNumbersByOwner, getUserLinkedCount,
   addNumber, toggleNumber, deleteNumber, getAllNumbers,
-  // Sessions
   upsertBotSession, getActiveBotSessions,
+  getSiteSetting, setSiteSetting,
 };

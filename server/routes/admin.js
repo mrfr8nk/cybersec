@@ -1,5 +1,7 @@
 const express = require('express');
 const router  = express.Router();
+const path    = require('path');
+const fs      = require('fs');
 const { protect, adminOnly } = require('../middleware/auth');
 const {
   getStats,
@@ -9,6 +11,11 @@ const {
   deleteUser,
   updateUserPlan,
   getAllNumbers,
+  getPendingUpgradeRequests,
+  approveUpgrade,
+  rejectUpgrade,
+  getSiteSetting,
+  setSiteSetting,
 } = require('../db-service');
 
 router.use(protect, adminOnly);
@@ -16,7 +23,9 @@ router.use(protect, adminOnly);
 // GET /api/admin/stats
 router.get('/stats', async (req, res) => {
   try {
-    res.json(await getStats());
+    const stats = await getStats();
+    const pendingUpgrades = await getPendingUpgradeRequests();
+    res.json({ ...stats, pendingUpgradeCount: pendingUpgrades.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -28,7 +37,13 @@ router.get('/users', async (req, res) => {
     const { search, page = 1, limit = 20 } = req.query;
     const result = await getAllUsers(search || null, parseInt(page), parseInt(limit));
     res.json({
-      users: result.users.map(u => ({ ...u, subscriptionPlan: u.subscription_plan })),
+      users: result.users.map(u => ({
+        ...u,
+        subscriptionPlan:  u.subscription_plan,
+        trialExpiresAt:    u.trial_expires_at || null,
+        upgradeRequest:    u.upgrade_request || 'none',
+        upgradeRequestAt:  u.upgrade_request_at || null,
+      })),
       total: result.total,
       page:  parseInt(page),
       pages: result.pages,
@@ -42,6 +57,40 @@ router.get('/users', async (req, res) => {
 router.get('/numbers', async (req, res) => {
   try {
     res.json(await getAllNumbers());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/upgrade-requests
+router.get('/upgrade-requests', async (req, res) => {
+  try {
+    const requests = await getPendingUpgradeRequests();
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/admin/upgrade-requests/:id/approve
+router.put('/upgrade-requests/:id/approve', async (req, res) => {
+  try {
+    const { plan } = req.body;
+    if (!['pro', 'enterprise'].includes(plan))
+      return res.status(400).json({ error: 'Invalid plan.' });
+    const updated = await approveUpgrade(req.params.id, plan);
+    if (!updated) return res.status(404).json({ error: 'User not found.' });
+    res.json({ message: `Upgrade to ${plan.toUpperCase()} approved.`, user: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/admin/upgrade-requests/:id/reject
+router.put('/upgrade-requests/:id/reject', async (req, res) => {
+  try {
+    await rejectUpgrade(req.params.id);
+    res.json({ message: 'Upgrade request rejected.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -83,6 +132,64 @@ router.put('/users/:id/plan', async (req, res) => {
     const updated = await updateUserPlan(req.params.id, plan);
     if (!updated) return res.status(404).json({ error: 'User not found.' });
     res.json({ message: `Plan updated to ${plan}.`, user: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Audio Management ─────────────────────────────────────────────────────────
+
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const multer = require('multer');
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename:    (req, file, cb) => cb(null, 'site-audio' + path.extname(file.originalname)),
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('audio/')) return cb(null, true);
+    cb(new Error('Only audio files are allowed.'));
+  },
+});
+
+// POST /api/admin/audio
+router.post('/audio', upload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No audio file provided.' });
+    await setSiteSetting('site_audio_filename', req.file.filename);
+    await setSiteSetting('site_audio_original', req.file.originalname);
+    res.json({ message: 'Audio uploaded successfully.', filename: req.file.filename });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/admin/audio
+router.delete('/audio', async (req, res) => {
+  try {
+    const filename = await getSiteSetting('site_audio_filename');
+    if (filename) {
+      const filePath = path.join(UPLOADS_DIR, filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    await setSiteSetting('site_audio_filename', '');
+    await setSiteSetting('site_audio_original', '');
+    res.json({ message: 'Audio removed.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/audio
+router.get('/audio', async (req, res) => {
+  try {
+    const filename = await getSiteSetting('site_audio_filename');
+    const original = await getSiteSetting('site_audio_original');
+    res.json({ filename: filename || '', original: original || '' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

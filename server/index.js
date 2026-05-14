@@ -1,6 +1,5 @@
 require('dotenv').config();
 
-// Prevent pair.js background errors from crashing the API server
 process.on('uncaughtException',  err => console.error('[Server] Uncaught exception (non-fatal):', err.message));
 process.on('unhandledRejection', err => console.error('[Server] Unhandled rejection (non-fatal):', err?.message || err));
 
@@ -39,6 +38,22 @@ app.use('/api/auth/', authLimiter);
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10kb' }));
 
+// ── Serve uploaded audio files ──────────────────────────────────────────────
+const UPLOADS_DIR = path.join(__dirname, '../uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+// ── Public audio info endpoint (no auth required) ───────────────────────────
+app.get('/api/site/audio', async (req, res) => {
+  try {
+    const filename = await svc.getSiteSetting('site_audio_filename');
+    const original = await svc.getSiteSetting('site_audio_original');
+    res.json({ filename: filename || '', original: original || '' });
+  } catch (err) {
+    res.json({ filename: '', original: '' });
+  }
+});
+
 // ── API routes ──────────────────────────────────────────────────────────────
 app.use('/api/auth',    authRoutes);
 app.use('/api/user',    userRoutes);
@@ -66,7 +81,6 @@ async function ensureAdminAccount() {
   try {
     let user = await svc.findUserByEmail(email);
     if (!user) {
-      // Derive a username from the email local part, ensure uniqueness
       let username = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 28) || 'admin';
       const existing = await svc.findUserByUsername(username, null);
       if (existing) username = username + '_admin';
@@ -92,7 +106,6 @@ initDb()
       console.log(`🚀 CYBERSECPRO API running on port ${PORT}`)
     );
 
-    // Reconnect all persisted WhatsApp sessions after a short boot delay
     setTimeout(async () => {
       try {
         const { autoLoadPairs } = require('../autoload');
